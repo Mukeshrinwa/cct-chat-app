@@ -1,4 +1,5 @@
 import path from 'path';
+/* eslint-disable import/no-extraneous-dependencies */
 import checker from 'vite-plugin-checker';
 import { loadEnv, defineConfig } from 'vite';
 import react from '@vitejs/plugin-react-swc';
@@ -7,7 +8,7 @@ import react from '@vitejs/plugin-react-swc';
 
 const PORT = 8080;
 
-const env = loadEnv('all', process.cwd());
+const _env = loadEnv('all', process.cwd());
 
 export default defineConfig({
   // base: env.VITE_BASE_PATH,

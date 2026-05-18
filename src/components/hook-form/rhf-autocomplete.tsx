@@ -24,7 +24,6 @@ export function RHFAutocomplete({
   name,
   label,
   helperText,
-  hiddenLabel,
   placeholder,
   ...other
 }: RHFAutocompleteProps) {

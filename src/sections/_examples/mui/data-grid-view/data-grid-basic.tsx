@@ -49,18 +49,21 @@ const columns: GridColDef[] = [
     disableColumnMenu: true,
     getActions: (params) => [
       <GridActionsCellItem
+        key={`${params.id}-view`}
         showInMenu
         icon={<Iconify icon="solar:eye-bold" />}
         label="View"
         onClick={() => console.info('VIEW', params.row.id)}
       />,
       <GridActionsCellItem
+        key={`${params.id}-edit`}
         showInMenu
         icon={<Iconify icon="solar:pen-bold" />}
         label="Edit"
         onClick={() => console.info('EDIT', params.row.id)}
       />,
       <GridActionsCellItem
+        key={`${params.id}-delete`}
         showInMenu
         icon={<Iconify icon="solar:trash-bin-trash-bold" />}
         label="Delete"

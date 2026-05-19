@@ -1,15 +1,14 @@
 import dayjs from 'dayjs';
-import 'dayjs/locale/en';
-import 'dayjs/locale/vi';
-import 'dayjs/locale/fr';
-import 'dayjs/locale/zh-cn';
 import 'dayjs/locale/ar-sa';
+import 'dayjs/locale/en';
+import 'dayjs/locale/fr';
+import 'dayjs/locale/vi';
+import 'dayjs/locale/zh-cn';
 
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider as Provider } from '@mui/x-date-pickers/LocalizationProvider';
 
 import { useTranslate } from './use-locales';
-
 // ----------------------------------------------------------------------
 
 type Props = {

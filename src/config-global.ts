@@ -51,7 +51,8 @@ export const CONFIG: ConfigValue = {
   auth: {
     method: 'jwt',
     skip: false,
-    redirectPath: paths.dashboard.root,
+    // After login, redirect users directly to the chat page
+    redirectPath: paths.dashboard.chat,
   },
   /**
    * Mapbox

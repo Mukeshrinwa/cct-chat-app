@@ -2,13 +2,12 @@ import type { IChatParticipant } from 'src/types/chat';
 
 import { useState, useEffect, useCallback } from 'react';
 
-import Typography from '@mui/material/Typography';
+import Box from '@mui/material/Box';
 
 import { paths } from 'src/routes/paths';
 import { useRouter, useSearchParams } from 'src/routes/hooks';
 
 import { CONFIG } from 'src/config-global';
-import { DashboardContent } from 'src/layouts/dashboard';
 import { useGetContacts, useGetConversation, useGetConversations } from 'src/actions/chat';
 
 import { EmptyContent } from 'src/components/empty-content';
@@ -51,8 +50,8 @@ export function ChatView() {
 
   const participants: IChatParticipant[] = conversation
     ? conversation.participants.filter(
-        (participant: IChatParticipant) => participant.id !== `${user?.id}`
-      )
+      (participant: IChatParticipant) => participant.id !== `${user?.id}`
+    )
     : [];
 
   useEffect(() => {
@@ -66,22 +65,13 @@ export function ChatView() {
   }, []);
 
   return (
-    <DashboardContent
-      maxWidth={false}
-      sx={{ display: 'flex', flex: '1 1 auto', flexDirection: 'column' }}
-    >
-      <Typography variant="h4" sx={{ mb: { xs: 3, md: 5 } }}>
-        Chat
-      </Typography>
-
+    <Box sx={{ display: 'flex', flex: '1 1 auto', flexDirection: 'column', height: '100vh' }}>
       <Layout
         sx={{
           minHeight: 0,
           flex: '1 1 0',
-          borderRadius: 2,
           position: 'relative',
           bgcolor: 'background.paper',
-          boxShadow: (theme) => theme.customShadows.card,
         }}
         slots={{
           header: selectedConversationId ? (
@@ -136,6 +126,6 @@ export function ChatView() {
           ),
         }}
       />
-    </DashboardContent>
+    </Box>
   );
 }

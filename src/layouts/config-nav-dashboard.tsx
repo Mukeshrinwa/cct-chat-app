@@ -44,8 +44,8 @@ const ICONS = {
 
 export const navData = [
   {
-    subheader: 'Chat',
-    items: [{ title: 'Chat', path: paths.dashboard.chat, icon: ICONS.chat }],
+    subheader: 'User',
+    items: [{ title: 'User', path: paths.dashboard.user.root, icon: ICONS.user }],
   },
 ];
 

@@ -12,9 +12,10 @@ const icon = (name: string) => (
 );
 
 const ICONS = {
+    chat: icon('ic-chat'),
+
   job: icon('ic-job'),
   blog: icon('ic-blog'),
-  chat: icon('ic-chat'),
   mail: icon('ic-mail'),
   user: icon('ic-user'),
   file: icon('ic-file'),

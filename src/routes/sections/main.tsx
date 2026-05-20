@@ -8,7 +8,6 @@ import { SplashScreen } from 'src/components/loading-screen';
 
 // ----------------------------------------------------------------------
 
-const AboutPage = lazy(() => import('src/pages/about-us'));
 const ContactPage = lazy(() => import('src/pages/contact-us'));
 const ComingSoonPage = lazy(() => import('src/pages/coming-soon'));
 // Product
@@ -37,10 +36,7 @@ export const mainRoutes = [
           </MainLayout>
         ),
         children: [
-          {
-            path: 'about-us',
-            element: <AboutPage />,
-          },
+         
           {
             path: 'contact-us',
             element: <ContactPage />,

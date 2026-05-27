@@ -40,6 +40,12 @@ export const endpoints = {
     me: '/api/v1/users/me',
     signIn: '/api/v1/auth/login',
     signUp: '/api/v1/auth/register',
+    sendOtp: '/api/v1/auth/send-otp',
+    verifyOtp: '/api/v1/auth/verify-otp',
+    checkUsername: '/api/v1/auth/check-username',
+  },
+  user: {
+    update: '/api/v1/users/update',
   },
   mail: {
     list: '/api/mail/list',

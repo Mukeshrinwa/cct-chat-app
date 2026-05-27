@@ -25,6 +25,8 @@ import { usePopover, CustomPopover } from 'src/components/custom-popover';
 import { useMockedUser } from 'src/auth/hooks';
 import { signOut as jwtSignOut } from 'src/auth/context/jwt/action';
 
+import { ChatProfileEditDialog } from './chat-profile-edit-dialog';
+
 // ----------------------------------------------------------------------
 
 export function ChatNavAccount() {
@@ -33,6 +35,8 @@ export function ChatNavAccount() {
   const popover = usePopover();
 
   const [status, setStatus] = useState<'online' | 'alway' | 'busy' | 'offline'>('online');
+
+  const [profileDialogOpen, setProfileDialogOpen] = useState(false);
 
   const handleChangeStatus = useCallback((event: SelectChangeEvent) => {
     setStatus(event.target.value as 'online' | 'alway' | 'busy' | 'offline');
@@ -47,6 +51,11 @@ export function ChatNavAccount() {
       console.error(error);
       toast.error('Unable to logout!');
     }
+  }, [popover]);
+
+  const handleOpenProfile = useCallback(() => {
+    popover.onClose();
+    setProfileDialogOpen(true);
   }, [popover]);
 
   return (
@@ -121,7 +130,7 @@ export function ChatNavAccount() {
             </FormControl>
           </MenuItem>
 
-          <MenuItem>
+          <MenuItem onClick={handleOpenProfile}>
             <Iconify icon="solar:user-id-bold" width={24} />
             Profile
           </MenuItem>
@@ -132,6 +141,11 @@ export function ChatNavAccount() {
           </MenuItem>
         </MenuList>
       </CustomPopover>
+
+      <ChatProfileEditDialog
+        open={profileDialogOpen}
+        onClose={() => setProfileDialogOpen(false)}
+      />
     </>
   );
 }

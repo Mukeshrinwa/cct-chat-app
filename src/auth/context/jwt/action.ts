@@ -1,7 +1,6 @@
 import axios, { endpoints } from 'src/utils/axios';
 
 import { setSession } from './utils';
-import { STORAGE_KEY } from './constant';
 
 // ----------------------------------------------------------------------
 
@@ -11,12 +10,97 @@ export type SignInParams = {
 };
 
 export type SignUpParams = {
-  email: string;
+  mobile: string;
+  otp: string;
+  name: string;
+  username: string;
   password: string;
-  firstName: string;
-  lastName: string;
+  avatar?: string;
+  about?: string;
+  role?: string;
 };
 
+/** **************************************
+ * Send OTP
+ *************************************** */
+export const sendOtp = async (mobile: string): Promise<void> => {
+  try {
+    await axios.post(endpoints.auth.sendOtp, { mobile });
+  } catch (error) {
+    console.error('Error sending OTP:', error);
+    throw error;
+  }
+};
+
+/** **************************************
+ * Verify OTP
+ *************************************** */
+export const verifyOtp = async (
+  mobile: string,
+  otp: string,
+  deviceType: string = 'web'
+): Promise<void> => {
+  try {
+    await axios.post(endpoints.auth.verifyOtp, { mobile, otp, deviceType });
+  } catch (error) {
+    console.error('Error verifying OTP:', error);
+    throw error;
+  }
+};
+
+/** **************************************
+ * Check username availability
+ *************************************** */
+export const checkUsername = async (username: string): Promise<boolean> => {
+  try {
+    const res = await axios.post(endpoints.auth.checkUsername, { username });
+    // Assuming API returns { available: true/false } or similar
+    return res.data?.available ?? true;
+  } catch (error) {
+    console.error('Error checking username:', error);
+    throw error;
+  }
+};
+
+/** **************************************
+ * Sign up (Register)
+ *************************************** */
+export const signUp = async ({
+  mobile,
+  otp,
+  name,
+  username,
+  password,
+  avatar,
+  about,
+  role,
+}: SignUpParams): Promise<void> => {
+  const params = {
+    mobile,
+    otp,
+    name,
+    username,
+    password,
+    avatar: avatar || 'https://api-dev-minimal-v6.vercel.app/assets/images/avatar/avatar-25.webp',
+    about: about || 'Hey there! I am using this app.',
+    role: role || 'user',
+  };
+
+  try {
+    const res = await axios.post(endpoints.auth.signUp, params);
+
+    const { token: accessToken } = res.data;
+
+    if (!accessToken) {
+      throw new Error('Access token not found in response');
+    }
+
+    setSession(accessToken);
+  } catch (error) {
+    console.error('Error during sign up:', error);
+    throw error;
+  }
+};
 /** **************************************
  * Sign in
  *************************************** */
@@ -51,37 +135,6 @@ export const signInWithPassword = async ({ identifier, password }: SignInParams)
   }
 };
 
-/** **************************************
- * Sign up
- *************************************** */
-export const signUp = async ({
-  email,
-  password,
-  firstName,
-  lastName,
-}: SignUpParams): Promise<void> => {
-  const params = {
-    email,
-    password,
-    firstName,
-    lastName,
-  };
-
-  try {
-    const res = await axios.post(endpoints.auth.signUp, params);
-
-    const { accessToken } = res.data;
-
-    if (!accessToken) {
-      throw new Error('Access token not found in response');
-    }
-
-    sessionStorage.setItem(STORAGE_KEY, accessToken);
-  } catch (error) {
-    console.error('Error during sign up:', error);
-    throw error;
-  }
-};
 
 /** **************************************
  * Sign out

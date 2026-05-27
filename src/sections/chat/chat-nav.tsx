@@ -1,6 +1,6 @@
 import type { IChatParticipant, IChatConversations } from 'src/types/chat';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
@@ -10,6 +10,7 @@ import TextField from '@mui/material/TextField';
 import IconButton from '@mui/material/IconButton';
 import InputAdornment from '@mui/material/InputAdornment';
 import ClickAwayListener from '@mui/material/ClickAwayListener';
+import CircularProgress from '@mui/material/CircularProgress';
 
 import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
@@ -18,6 +19,9 @@ import { useResponsive } from 'src/hooks/use-responsive';
 
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
+
+import { searchUsers } from 'src/api/user';
+import type { UserData } from 'src/api/user';
 
 import { ToggleButton } from './styles';
 import { ChatNavItem } from './chat-nav-item';
@@ -40,6 +44,24 @@ type Props = {
   collapseNav: UseNavCollapseReturn;
   conversations: IChatConversations;
 };
+
+/**
+ * Map API user result to IChatParticipant format used by the UI
+ */
+function mapUserToParticipant(user: UserData): IChatParticipant {
+  return {
+    id: user._id,
+    name: user.name,
+    username: user.username,
+    role: user.role || 'user',
+    email: '',
+    address: '',
+    avatarUrl: user.avatar || '',
+    phoneNumber: '',
+    lastActivity: user.lastSeen || new Date().toISOString(),
+    status: user.isOnline ? 'online' : 'offline',
+  };
+}
 
 export function ChatNav({
   loading,
@@ -68,6 +90,11 @@ export function ChatNav({
     results: IChatParticipant[];
   }>({ query: '', results: [] });
 
+  const [searching, setSearching] = useState(false);
+
+  // Debounce timer ref
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     if (!mdUp) {
       onCloseDesktop();
@@ -89,20 +116,35 @@ export function ChatNav({
     router.push(paths.dashboard.chat);
   }, [mdUp, onCloseMobile, router]);
 
-  const handleSearchContacts = useCallback(
-    (inputValue: string) => {
-      setSearchContacts((prevState) => ({ ...prevState, query: inputValue }));
+  const handleSearchContacts = useCallback((inputValue: string) => {
+    setSearchContacts((prevState) => ({ ...prevState, query: inputValue }));
 
-      if (inputValue) {
-        const results = contacts.filter((contact) =>
-          contact.name.toLowerCase().includes(inputValue)
-        );
+    // Clear previous debounce timer
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
 
-        setSearchContacts((prevState) => ({ ...prevState, results }));
+    if (!inputValue) {
+      setSearchContacts({ query: '', results: [] });
+      setSearching(false);
+      return;
+    }
+
+    // Debounce: wait 400ms after user stops typing to call API
+    setSearching(true);
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const users = await searchUsers(inputValue);
+        const mapped = users.map(mapUserToParticipant);
+        setSearchContacts((prevState) => ({ ...prevState, results: mapped }));
+      } catch (error) {
+        console.error('Search failed:', error);
+        setSearchContacts((prevState) => ({ ...prevState, results: [] }));
+      } finally {
+        setSearching(false);
       }
-    },
-    [contacts]
-  );
+    }, 400);
+  }, []);
 
   const handleClickAwaySearch = useCallback(() => {
     setSearchContacts({ query: '', results: [] });
@@ -149,13 +191,18 @@ export function ChatNav({
         fullWidth
         value={searchContacts.query}
         onChange={(event) => handleSearchContacts(event.target.value)}
-        placeholder="Search contacts..."
+        placeholder="Search by username..."
         InputProps={{
           startAdornment: (
             <InputAdornment position="start">
               <Iconify icon="eva:search-fill" sx={{ color: 'text.disabled' }} />
             </InputAdornment>
           ),
+          endAdornment: searching ? (
+            <InputAdornment position="end">
+              <CircularProgress size={20} />
+            </InputAdornment>
+          ) : null,
         }}
         sx={{ mt: 2.5 }}
       />
@@ -191,7 +238,7 @@ export function ChatNav({
         renderLoading
       ) : (
         <Scrollbar sx={{ pb: 1 }}>
-          {searchContacts.query && !!conversations.allIds.length ? renderListResults : renderList}
+          {searchContacts.query ? renderListResults : renderList}
         </Scrollbar>
       )}
     </>

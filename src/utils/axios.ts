@@ -46,6 +46,8 @@ export const endpoints = {
   },
   user: {
     update: '/api/v1/users/update',
+    search: '/api/v1/users/search',
+    getAll: '/api/v1/users/get',
   },
   mail: {
     list: '/api/mail/list',

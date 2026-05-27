@@ -24,6 +24,7 @@ export type IChatMessage = {
 export type IChatParticipant = {
   id: string;
   name: string;
+  username?: string;
   role: string;
   email: string;
   address: string;

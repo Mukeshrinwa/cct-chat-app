@@ -1,6 +1,7 @@
 import type { IChatParticipant } from 'src/types/chat';
 
 import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
 import Avatar from '@mui/material/Avatar';
 import Typography from '@mui/material/Typography';
 import ListItemButton from '@mui/material/ListItemButton';
@@ -39,10 +40,31 @@ export function ChatNavSearchResults({ query, results, onClickResult }: Props) {
           <Box key={result.id} component="li" sx={{ display: 'flex' }}>
             <ListItemButton
               onClick={() => onClickResult(result)}
-              sx={{ gap: 2, py: 1.5, px: 2.5, typography: 'subtitle2' }}
+              sx={{ gap: 2, py: 1.5, px: 2.5 }}
             >
               <Avatar alt={result.name} src={result.avatarUrl} />
-              {result.name}
+
+              <Stack sx={{ minWidth: 0 }}>
+                <Typography variant="subtitle2" noWrap>
+                  {result.name}
+                </Typography>
+                <Typography variant="caption" noWrap sx={{ color: 'text.secondary' }}>
+                  @{result.username || result.name}
+                </Typography>
+              </Stack>
+
+              {result.status === 'online' && (
+                <Box
+                  sx={{
+                    ml: 'auto',
+                    width: 10,
+                    height: 10,
+                    flexShrink: 0,
+                    borderRadius: '50%',
+                    bgcolor: 'success.main',
+                  }}
+                />
+              )}
             </ListItemButton>
           </Box>
         ))}
@@ -53,7 +75,7 @@ export function ChatNavSearchResults({ query, results, onClickResult }: Props) {
   return (
     <>
       <Typography variant="h6" sx={{ px: 2.5, mb: 2 }}>
-        Contacts ({totalResults})
+        Users ({totalResults})
       </Typography>
 
       {notFound ? renderNotFound : renderResults}

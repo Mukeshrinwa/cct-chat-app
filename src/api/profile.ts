@@ -1,11 +1,10 @@
 import axios, { endpoints } from 'src/utils/axios';
-import { CONFIG } from 'src/config-global';
 
 // ----------------------------------------------------------------------
 
-const BASE_URL = CONFIG.site.serverUrl;
-
-// ----------------------------------------------------------------------
+/**
+ * Profile API Types
+ */
 
 export type UpdateProfileParams = {
   name?: string;
@@ -36,6 +35,8 @@ export async function updateProfile(params: UpdateProfileParams) {
   }
 }
 
+// ----------------------------------------------------------------------
+
 /**
  * Upload profile avatar image
  * PUT /api/v1/users/update (multipart/form-data)
@@ -61,6 +62,8 @@ export async function uploadAvatar(file: File) {
   }
 }
 
+// ----------------------------------------------------------------------
+
 /**
  * Check if a username is available
  * POST /api/v1/auth/check-username
@@ -74,6 +77,8 @@ export async function checkUsernameAvailability(username: string): Promise<boole
     throw error;
   }
 }
+
+// ----------------------------------------------------------------------
 
 /**
  * Get current user profile

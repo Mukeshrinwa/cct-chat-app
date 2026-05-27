@@ -6,7 +6,7 @@ import { STORAGE_KEY } from './constant';
 // ----------------------------------------------------------------------
 
 export type SignInParams = {
-  email: string;
+  identifier: string;
   password: string;
 };
 
@@ -20,13 +20,25 @@ export type SignUpParams = {
 /** **************************************
  * Sign in
  *************************************** */
-export const signInWithPassword = async ({ email, password }: SignInParams): Promise<void> => {
+export const signInWithPassword = async ({ identifier, password }: SignInParams): Promise<void> => {
   try {
-    const params = { email, password };
+    // Detect if identifier is a mobile number (starts with + or contains only digits)
+    const trimmed = identifier.trim();
+    const isMobile = /^\+?\d{7,15}$/.test(trimmed);
+
+    // Auto-add +91 country code if user enters plain 10-digit number
+    let mobile = trimmed;
+    if (isMobile && !trimmed.startsWith('+')) {
+      mobile = `+91${trimmed}`;
+    }
+
+    const params = isMobile
+      ? { mobile, password }
+      : { username: trimmed, password };
 
     const res = await axios.post(endpoints.auth.signIn, params);
 
-    const { accessToken } = res.data;
+    const { token: accessToken } = res.data;
 
     if (!accessToken) {
       throw new Error('Access token not found in response');

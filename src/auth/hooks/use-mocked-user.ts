@@ -1,33 +1,32 @@
-import { _mock } from 'src/_mock';
-
-// To get the user from the <AuthContext/>, you can use
-
-// Change:
-// import { useMockedUser } from 'src/auth/hooks';
-// const { user } = useMockedUser();
-
-// To:
-// import { useAuthContext } from 'src/auth/hooks';
-// const { user } = useAuthContext();
+import { useAuthContext } from './use-auth-context';
 
 // ----------------------------------------------------------------------
 
+/**
+ * This hook was originally returning hardcoded mock data.
+ * It now returns the real authenticated user from AuthContext,
+ * mapping API fields to the field names used across the app.
+ */
 export function useMockedUser() {
-  const user = {
-    id: '8864c717-587d-472a-929a-8e5f298024da-0',
-    displayName: 'Jaydon Frankie',
-    email: 'demo@minimals.cc',
-    photoURL: _mock.image.avatar(24),
-    phoneNumber: _mock.phoneNumber(1),
-    country: _mock.countryNames(1),
-    address: '90210 Broadway Blvd',
-    state: 'California',
-    city: 'San Francisco',
-    zipCode: '94116',
-    about: 'Praesent turpis. Phasellus viverra nulla ut metus varius laoreet. Phasellus tempus.',
-    role: 'admin',
-    isPublic: true,
-  };
+  const { user: authUser } = useAuthContext();
+
+  const user = authUser
+    ? {
+        id: authUser._id || authUser.id,
+        displayName: authUser.name || authUser.displayName || '',
+        email: authUser.email || authUser.mobile || '',
+        photoURL: authUser.avatar || authUser.photoURL || '',
+        phoneNumber: authUser.mobile || authUser.phoneNumber || '',
+        country: authUser.country || '',
+        address: authUser.address || '',
+        state: authUser.state || '',
+        city: authUser.city || '',
+        zipCode: authUser.zipCode || '',
+        about: authUser.about || '',
+        role: authUser.role || 'user',
+        isPublic: true,
+      }
+    : null;
 
   return { user };
 }

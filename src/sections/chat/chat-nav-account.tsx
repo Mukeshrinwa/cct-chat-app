@@ -16,10 +16,14 @@ import ListItemText from '@mui/material/ListItemText';
 import { svgIconClasses } from '@mui/material/SvgIcon';
 import Badge, { badgeClasses } from '@mui/material/Badge';
 
+import { paths } from 'src/routes/paths';
+
+import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { usePopover, CustomPopover } from 'src/components/custom-popover';
 
 import { useMockedUser } from 'src/auth/hooks';
+import { signOut as jwtSignOut } from 'src/auth/context/jwt/action';
 
 // ----------------------------------------------------------------------
 
@@ -33,6 +37,17 @@ export function ChatNavAccount() {
   const handleChangeStatus = useCallback((event: SelectChangeEvent) => {
     setStatus(event.target.value as 'online' | 'alway' | 'busy' | 'offline');
   }, []);
+
+  const handleLogout = useCallback(async () => {
+    try {
+      await jwtSignOut();
+      popover.onClose();
+      window.location.href = paths.auth.jwt.signIn;
+    } catch (error) {
+      console.error(error);
+      toast.error('Unable to logout!');
+    }
+  }, [popover]);
 
   return (
     <>
@@ -64,7 +79,7 @@ export function ChatNavAccount() {
           />
 
           <Tooltip title="Log out">
-            <IconButton color="error">
+            <IconButton color="error" onClick={handleLogout}>
               <Iconify icon="ic:round-power-settings-new" />
             </IconButton>
           </Tooltip>

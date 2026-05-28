@@ -35,9 +35,9 @@ function mapUserToParticipant(user: any): IChatParticipant {
 
 // ----------------------------------------------------------------------
 
-type ContactsData = {
-  contacts: IChatParticipant[];
-};
+// type ContactsData = {
+//   contacts: IChatParticipant[];
+// };
 
 export function useGetContacts() {
   const { data, isLoading, error, isValidating } = useSWR<any>(

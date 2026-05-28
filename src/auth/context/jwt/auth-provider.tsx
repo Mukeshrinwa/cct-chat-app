@@ -4,9 +4,9 @@ import { useSetState } from 'src/hooks/use-set-state';
 
 import axios, { endpoints } from 'src/utils/axios';
 
-import { STORAGE_KEY } from './constant';
 import { AuthContext } from '../auth-context';
-import { setSession, isValidToken } from './utils';
+import { STORAGE_KEY, REFRESH_STORAGE_KEY } from './constant';
+import { setSession, isValidToken, refreshAccessToken } from './utils';
 
 import type { AuthState } from '../../types';
 
@@ -30,11 +30,21 @@ export function AuthProvider({ children }: Props) {
 
   const checkUserSession = useCallback(async () => {
     try {
-      const accessToken = sessionStorage.getItem(STORAGE_KEY);
+      let accessToken = sessionStorage.getItem(STORAGE_KEY);
+      const refreshToken = sessionStorage.getItem(REFRESH_STORAGE_KEY);
 
       if (accessToken && isValidToken(accessToken)) {
-        setSession(accessToken);
+        setSession(accessToken, refreshToken);
+      } else if (refreshToken) {
+        try {
+          accessToken = await refreshAccessToken();
+        } catch (err) {
+          console.error('Failed to auto-refresh token during session check:', err);
+          accessToken = null;
+        }
+      }
 
+      if (accessToken && isValidToken(accessToken)) {
         const res = await axios.get(endpoints.auth.me);
 
         const user = res.data.data;

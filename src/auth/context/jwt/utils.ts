@@ -2,7 +2,7 @@ import { paths } from 'src/routes/paths';
 
 import axios from 'src/utils/axios';
 
-import { STORAGE_KEY } from './constant';
+import { STORAGE_KEY, REFRESH_STORAGE_KEY } from './constant';
 
 // ----------------------------------------------------------------------
 
@@ -51,32 +51,42 @@ export function isValidToken(accessToken: string) {
 
 // ----------------------------------------------------------------------
 
+let expiredTimer: any = null;
+
 export function tokenExpired(exp: number) {
   const currentTime = Date.now();
   const timeLeft = exp * 1000 - currentTime;
 
-  setTimeout(() => {
+  if (expiredTimer) {
+    clearTimeout(expiredTimer);
+  }
+
+  // Proactively refresh 10 seconds before the token expires
+  const refreshTime = Math.max(0, timeLeft - 10000);
+
+  expiredTimer = setTimeout(async () => {
     try {
-      alert('Token expired!');
-      sessionStorage.removeItem(STORAGE_KEY);
-      window.location.href = paths.auth.jwt.signIn;
+      console.log('Access token is about to expire, proactively refreshing...');
+      await refreshAccessToken();
     } catch (error) {
-      console.error('Error during token expiration:', error);
-      throw error;
+      console.error('Proactive token refresh failed:', error);
     }
-  }, timeLeft);
+  }, refreshTime);
 }
 
 // ----------------------------------------------------------------------
 
-export async function setSession(accessToken: string | null) {
+export async function setSession(accessToken: string | null, refreshToken?: string | null) {
   try {
     if (accessToken) {
       sessionStorage.setItem(STORAGE_KEY, accessToken);
+      if (refreshToken) {
+        sessionStorage.setItem(REFRESH_STORAGE_KEY, refreshToken);
+      }
 
       axios.defaults.headers.common.Authorization = `Bearer ${accessToken}`;
 
-      const decodedToken = jwtDecode(accessToken); // ~3 days by minimals server
+      const decodedToken = jwtDecode(accessToken);
 
       if (decodedToken && 'exp' in decodedToken) {
         tokenExpired(decodedToken.exp);
@@ -85,10 +95,42 @@ export async function setSession(accessToken: string | null) {
       }
     } else {
       sessionStorage.removeItem(STORAGE_KEY);
+      sessionStorage.removeItem(REFRESH_STORAGE_KEY);
       delete axios.defaults.headers.common.Authorization;
+
+      if (expiredTimer) {
+        clearTimeout(expiredTimer);
+      }
     }
   } catch (error) {
     console.error('Error during set session:', error);
+    throw error;
+  }
+}
+
+// ----------------------------------------------------------------------
+
+export async function refreshAccessToken() {
+  try {
+    const refreshToken = sessionStorage.getItem(REFRESH_STORAGE_KEY);
+    if (!refreshToken) {
+      throw new Error('No refresh token available');
+    }
+
+    const response = await axios.post('/api/v1/auth/refresh-token', { refreshToken });
+    const { token: newAccessToken } = response.data;
+
+    if (!newAccessToken) {
+      throw new Error('Refresh failed - no access token in response');
+    }
+
+    await setSession(newAccessToken, refreshToken);
+    console.log('Successfully refreshed access token.');
+    return newAccessToken;
+  } catch (error) {
+    console.error('Failed to refresh access token:', error);
+    await setSession(null);
+    window.location.href = paths.auth.jwt.signIn;
     throw error;
   }
 }

@@ -89,13 +89,13 @@ export const signUp = async ({
   try {
     const res = await axios.post(endpoints.auth.signUp, params);
 
-    const { token: accessToken } = res.data;
+    const { token: accessToken, refreshToken } = res.data;
 
     if (!accessToken) {
       throw new Error('Access token not found in response');
     }
 
-    setSession(accessToken);
+    setSession(accessToken, refreshToken);
   } catch (error) {
     console.error('Error during sign up:', error);
     throw error;
@@ -122,13 +122,13 @@ export const signInWithPassword = async ({ identifier, password }: SignInParams)
 
     const res = await axios.post(endpoints.auth.signIn, params);
 
-    const { token: accessToken } = res.data;
+    const { token: accessToken, refreshToken } = res.data;
 
     if (!accessToken) {
       throw new Error('Access token not found in response');
     }
 
-    setSession(accessToken);
+    setSession(accessToken, refreshToken);
   } catch (error) {
     console.error('Error during sign in:', error);
     throw error;

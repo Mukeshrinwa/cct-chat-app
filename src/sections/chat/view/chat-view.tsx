@@ -60,6 +60,12 @@ export function ChatView() {
     }
   }, [conversationError, router, selectedConversationId]);
 
+  useEffect(() => {
+    if (conversation && conversation.id && conversation.id !== selectedConversationId) {
+      router.replace(`${paths.dashboard.chat}?id=${conversation.id}`);
+    }
+  }, [conversation, selectedConversationId, router]);
+
   const handleAddRecipients = useCallback((selected: IChatParticipant[]) => {
     setRecipients(selected);
   }, []);

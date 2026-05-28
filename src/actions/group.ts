@@ -3,6 +3,8 @@ import useSWR, { mutate } from 'swr';
 
 import axios, { fetcher } from 'src/utils/axios';
 
+import { socketService } from 'src/socket/socket-service';
+
 // ----------------------------------------------------------------------
 
 const swrOptions = {
@@ -62,12 +64,31 @@ export function useGetGroup(groupId: string) {
 
 export async function createGroup(groupData: { name: string; participants: string[]; avatar?: string }) {
   try {
-    const res = await axios.post('/api/v1/groups/create', groupData);
+    let socketSent = false;
+    try {
+      if (socketService.isConnected()) {
+        await socketService.emit('create_group', {
+          name: groupData.name,
+          participants: groupData.participants,
+        });
+        socketSent = true;
+        console.log('Group created via socket');
+      }
+    } catch (socketError) {
+      console.error('Socket createGroup failed, falling back to HTTP API:', socketError);
+    }
+
+    let resData = null;
+    if (!socketSent) {
+      const res = await axios.post('/api/v1/groups/create', groupData);
+      resData = res.data;
+      console.log('Group created via HTTP API fallback');
+    }
 
     mutate('/api/v1/groups/list');
     mutate('/api/v1/chats/conversations');
 
-    return res.data;
+    return resData || { success: true };
   } catch (error) {
     console.error('Failed to create group:', error);
     throw error;

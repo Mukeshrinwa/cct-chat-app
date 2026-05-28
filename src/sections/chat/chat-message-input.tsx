@@ -13,6 +13,7 @@ import { useRouter } from 'src/routes/hooks';
 import { uuidv4 } from 'src/utils/uuidv4';
 import { fSub, today } from 'src/utils/format-time';
 
+import { useSocket } from 'src/socket';
 import { sendMessage, createConversation } from 'src/actions/chat';
 
 import { Iconify } from 'src/components/iconify';
@@ -53,6 +54,10 @@ export function ChatMessageInput({
   selectedConversationId,
 }: Props) {
   const router = useRouter();
+
+  const { startTyping } = useSocket();
+
+  const lastTypingTimeRef = useRef<number>(0);
 
   const { user } = useMockedUser();
 
@@ -165,31 +170,47 @@ export function ChatMessageInput({
 
   const handleChangeMessage = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     setMessage(event.target.value);
-  }, []);
+
+    if (selectedConversationId) {
+      const now = Date.now();
+      if (now - lastTypingTimeRef.current > 3000) {
+        startTyping({ conversationId: selectedConversationId });
+        lastTypingTimeRef.current = now;
+      }
+    }
+  }, [selectedConversationId, startTyping]);
+
+  const onSubmitMessage = useCallback(async () => {
+    try {
+      if (message.trim()) {
+        if (selectedConversationId) {
+          await sendMessage(selectedConversationId, messageData);
+        } else {
+          const res = await createConversation(conversationData);
+
+          router.push(`${paths.dashboard.chat}?id=${res.conversation.id}`);
+
+          onAddRecipients([]);
+        }
+        setMessage('');
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  }, [conversationData, message, messageData, onAddRecipients, router, selectedConversationId]);
 
   const handleSendMessage = useCallback(
     async (event: React.KeyboardEvent<HTMLInputElement>) => {
-      try {
-        if (event.key === 'Enter') {
-          if (message) {
-            if (selectedConversationId) {
-              await sendMessage(selectedConversationId, messageData);
-            } else {
-              const res = await createConversation(conversationData);
-
-              router.push(`${paths.dashboard.chat}?id=${res.conversation.id}`);
-
-              onAddRecipients([]);
-            }
-          }
-          setMessage('');
-        }
-      } catch (error) {
-        console.error(error);
+      if (event.key === 'Enter') {
+        onSubmitMessage();
       }
     },
-    [conversationData, message, messageData, onAddRecipients, router, selectedConversationId]
+    [onSubmitMessage]
   );
+
+  const handleSendClick = useCallback(async () => {
+    onSubmitMessage();
+  }, [onSubmitMessage]);
 
   return (
     <>
@@ -216,6 +237,15 @@ export function ChatMessageInput({
             </IconButton>
             <IconButton>
               <Iconify icon="solar:microphone-bold" />
+            </IconButton>
+            <IconButton onClick={handleSendClick} disabled={!message.trim()}>
+              <Iconify
+                icon="iconamoon:send-fill"
+                sx={{
+                  color: message.trim() ? 'primary.main' : 'text.disabled',
+                  transition: 'color 0.2s',
+                }}
+              />
             </IconButton>
           </Stack>
         }

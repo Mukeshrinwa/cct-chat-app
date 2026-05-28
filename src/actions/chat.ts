@@ -6,13 +6,15 @@ import useSWR, { mutate } from 'swr';
 import { keyBy } from 'src/utils/helper';
 import axios, { fetcher, endpoints } from 'src/utils/axios';
 
+import { socketService } from 'src/socket/socket-service';
+
 import { useMockedUser } from 'src/auth/hooks';
 
 // ----------------------------------------------------------------------
 
 const swrOptions = {
   revalidateIfStale: true,
-  revalidateOnFocus: true,
+  revalidateOnFocus: false, // Turn off automatic refetch on window focus since socket handles sync
   revalidateOnReconnect: true,
 };
 
@@ -79,10 +81,7 @@ export function useGetConversations() {
   const { data, isLoading, error, isValidating } = useSWR<any>(
     '/api/v1/chats/conversations',
     fetcher,
-    {
-      ...swrOptions,
-      refreshInterval: 5000, // Poll every 5 seconds for conversation list updates
-    }
+    swrOptions
   );
 
   const memoizedValue = useMemo(() => {
@@ -210,9 +209,7 @@ async function fetchConversationDetail(conversationId: string, currentUser: any)
   try {
     const checkRes = await axios.get(`/api/v1/chats/check/${conversationId}`);
     if (checkRes.data && checkRes.data.exists) {
-      realConvId = checkRes.data.conversationId;
-      otherUser = checkRes.data.otherUser;
-      conversationData = checkRes.data.conversation;
+      ({ conversationId: realConvId, otherUser, conversation: conversationData } = checkRes.data);
 
       // Update URL to the real conversation ID
       if (realConvId && realConvId !== conversationId) {
@@ -222,7 +219,7 @@ async function fetchConversationDetail(conversationId: string, currentUser: any)
         window.dispatchEvent(new Event('popstate'));
       }
     } else if (checkRes.data && !checkRes.data.exists) {
-      otherUser = checkRes.data.otherUser;
+      ({ otherUser } = checkRes.data);
     }
   } catch (e) {
     console.log('Not a recipient ID or check failed:', e);
@@ -379,10 +376,7 @@ export function useGetConversation(conversationId: string) {
   const { data, isLoading, error, isValidating } = useSWR<ConversationData>(
     url,
     () => fetchConversationDetail(conversationId, user),
-    {
-      ...swrOptions,
-      refreshInterval: 3000, // Poll every 3 seconds for active conversation messages
-    }
+    swrOptions
   );
 
   const memoizedValue = useMemo(
@@ -427,15 +421,88 @@ export async function sendMessage(conversationId: string, messageData: IChatMess
     console.error('Check conversation error in sendMessage:', error);
   }
 
-  // 2. Send message
-  await axios.post('/api/v1/chats/message', {
-    conversationId: realConvId,
-    text: messageData.body,
-  });
+  // 3. Mutate caches optimistically
+  const updateConversationCache = (current: any) => {
+    if (!current || !current.conversation) return current;
+    const exists = current.conversation.messages.some((m: any) => m.id === messageData.id);
+    if (exists) return current;
+    return {
+      ...current,
+      conversation: {
+        ...current.conversation,
+        messages: [...current.conversation.messages, messageData],
+      },
+    };
+  };
 
-  // 3. Mutate caches
-  mutate('/api/v1/chats/conversations');
-  mutate(`/api/v1/chats/conversations/${realConvId}`);
+  const updateConversationListCache = (current: any) => {
+    if (!current || !current.data) return current;
+    const conversationsList = current.data;
+    const index = conversationsList.findIndex((c: any) => c._id === realConvId);
+    
+    if (index === -1) return current;
+
+    const updatedList = [...conversationsList];
+    const conv = updatedList[index];
+
+    const updatedConv = {
+      ...conv,
+      lastMessage: {
+        _id: messageData.id,
+        text: messageData.body,
+        senderId: messageData.senderId,
+        type: messageData.contentType,
+      },
+      lastMessageAt: messageData.createdAt,
+    };
+
+    updatedList.splice(index, 1);
+    updatedList.unshift(updatedConv);
+
+    return {
+      ...current,
+      data: updatedList,
+    };
+  };
+
+  mutate('/api/v1/chats/conversations', updateConversationListCache, { revalidate: false });
+  mutate(`/api/v1/chats/conversations/${conversationId}`, updateConversationCache, { revalidate: false });
+  if (realConvId !== conversationId) {
+    mutate(`/api/v1/chats/conversations/${realConvId}`, updateConversationCache, { revalidate: false });
+  }
+
+  // 2. Send message
+  let socketSent = false;
+  try {
+    if (socketService.isConnected()) {
+      await socketService.emit('send_message', {
+        messageId: messageData.id,
+        conversationId: realConvId,
+        text: messageData.body,
+      });
+      socketSent = true;
+      console.log('Message sent via socket');
+    }
+  } catch (socketError) {
+    console.error('Socket sendMessage failed, falling back to HTTP API:', socketError);
+  }
+
+  if (!socketSent) {
+    await axios.post('/api/v1/chats/message', {
+      conversationId: realConvId,
+      text: messageData.body,
+    });
+    console.log('Message sent via HTTP API fallback');
+  }
+
+  // 3. Mutate caches in background after a delay
+  setTimeout(() => {
+    mutate('/api/v1/chats/conversations');
+    mutate(`/api/v1/chats/conversations/${realConvId}`);
+    if (conversationId !== realConvId) {
+      mutate(`/api/v1/chats/conversations/${conversationId}`);
+    }
+  }, 1000);
 }
 
 // ----------------------------------------------------------------------
@@ -485,10 +552,23 @@ export async function createConversation(conversationData: any) {
 // ----------------------------------------------------------------------
 
 export async function clickConversation(conversationId: string) {
+  let socketSent = false;
   try {
-    await axios.post(`/api/v1/chats/read/${conversationId}`);
+    if (socketService.isConnected()) {
+      await socketService.emit('mark_read', { conversationId });
+      socketSent = true;
+      console.log('Marked read via socket');
+    }
   } catch (error) {
-    console.error('Failed to mark conversation as read:', error);
+    console.error('Socket mark_read failed, falling back to HTTP API:', error);
+  }
+
+  if (!socketSent) {
+    try {
+      await axios.post(`/api/v1/chats/read/${conversationId}`);
+    } catch (error) {
+      console.error('Failed to mark conversation as read via HTTP API:', error);
+    }
   }
 
   mutate('/api/v1/chats/conversations');

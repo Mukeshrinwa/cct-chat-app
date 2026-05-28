@@ -124,12 +124,24 @@ export function fileTypeByUrl(fileUrl: string) {
 // ----------------------------------------------------------------------
 
 export function fileNameByUrl(fileUrl: string) {
-  return fileUrl.split('/').pop();
+  return (fileUrl && fileUrl.split('/').pop()) || '';
 }
 
 // ----------------------------------------------------------------------
 
 export function fileData(file: File | string) {
+  if (!file) {
+    return {
+      preview: '',
+      name: '',
+      type: '',
+      size: undefined,
+      path: '',
+      lastModified: undefined,
+      lastModifiedDate: undefined,
+    };
+  }
+
   // From url
   if (typeof file === 'string') {
     return {
@@ -145,11 +157,11 @@ export function fileData(file: File | string) {
 
   // From file
   return {
-    name: file.name,
-    size: file.size,
-    path: (file as ExtendFile).path,
-    type: file.type,
-    preview: (file as ExtendFile).preview,
+    name: file.name || '',
+    size: file.size || 0,
+    path: (file as ExtendFile).path || '',
+    type: file.type || '',
+    preview: (file as ExtendFile).preview || '',
     lastModified: file.lastModified,
     lastModifiedDate: (file as ExtendFile).lastModifiedDate,
   };

@@ -20,7 +20,7 @@ export function FileThumbnail({
   onDownload,
   ...other
 }: FileThumbnailProps) {
-  const previewUrl = typeof file === 'string' ? file : URL.createObjectURL(file);
+  const previewUrl = typeof file === 'string' ? file : (file && ((file as any) instanceof Blob || (file as any) instanceof File) ? URL.createObjectURL(file as any) : '');
 
   const { name, path } = fileData(file);
 

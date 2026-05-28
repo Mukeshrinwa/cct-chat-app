@@ -18,7 +18,11 @@ export function useMessage({ message, participants, currentUserId }: Props) {
 
   const me = senderDetails.type === 'me';
 
-  const hasImage = message.contentType === 'image';
+  const hasImage =
+    message.contentType === 'image' ||
+    (typeof message.body === 'string' &&
+      (message.body.startsWith('data:image/') ||
+        /\.(jpeg|jpg|gif|png|webp)($|\?)/i.test(message.body)));
 
   return { hasImage, me, senderDetails };
 }

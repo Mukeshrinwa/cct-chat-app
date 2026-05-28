@@ -3,6 +3,7 @@ import type { IChatParticipant } from 'src/types/chat';
 import { useRef, useMemo, useState, useCallback } from 'react';
 
 import Stack from '@mui/material/Stack';
+import Popover from '@mui/material/Popover';
 import InputBase from '@mui/material/InputBase';
 import IconButton from '@mui/material/IconButton';
 
@@ -17,6 +18,24 @@ import { sendMessage, createConversation } from 'src/actions/chat';
 import { Iconify } from 'src/components/iconify';
 
 import { useMockedUser } from 'src/auth/hooks';
+
+// ----------------------------------------------------------------------
+
+const EMOJIS = [
+  '😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇',
+  '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘', '😗', '😙', '😚',
+  '😋', '😛', '😝', '😜', '🤪', '🤨', '🧐', '🤓', '😎', '🤩',
+  '🥳', '😏', '😒', '😞', '😔', '😟', '😕', '🙁', '☹️', '😣',
+  '😖', '😫', '😩', '🥺', '😢', '😭', '😤', '😠', '😡', '🤬',
+  '🤯', '😳', '🥵', '🥶', '😱', '😨', '😰', '😥', '😓', '🤗',
+  '🤔', '🤭', '🤫', '🤥', '😶', '😐', '😑', '😬', '🙄', '😯',
+  '😦', '😧', '😮', '😲', '🥱', '😴', '🤤', '😪', '😵', '🤐',
+  '🥴', '🤢', '🤮', '🤧', '😷', '🤒', '🤕', '🤑', '🤠', '😈',
+  '👿', '👹', '👺', '🤡', '💩', '👻', '💀', '☠️', '👽', '👾',
+  '🤖', '🎃', '😺', '😸', '😹', '😻', '😼', '😽', '🙀', '😿',
+  '😾', '👋', '🤚', '🖐️', '✋', '🖖', '👌', '🤙', '👈', '👉',
+  '👆', '👇', '👍', '👎', '👊', '👏', '🙌', '🙏', '❤️', '💔'
+];
 
 // ----------------------------------------------------------------------
 
@@ -37,10 +56,6 @@ export function ChatMessageInput({
 
   const { user } = useMockedUser();
 
-  const fileRef = useRef<HTMLInputElement>(null);
-
-  const [message, setMessage] = useState('');
-
   const myContact = useMemo(
     () => ({
       id: `${user?.id}`,
@@ -55,6 +70,69 @@ export function ChatMessageInput({
     }),
     [user]
   );
+
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const [message, setMessage] = useState('');
+
+  const [emojiAnchor, setEmojiAnchor] = useState<HTMLButtonElement | null>(null);
+
+  const handleOpenEmoji = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+    setEmojiAnchor(event.currentTarget);
+  }, []);
+
+  const handleCloseEmoji = useCallback(() => {
+    setEmojiAnchor(null);
+  }, []);
+
+  const handleSelectEmoji = useCallback((emoji: string) => {
+    setMessage((prev) => prev + emoji);
+  }, []);
+
+  const handleFileChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const base64String = reader.result as string;
+      
+      const fileMessageData = {
+        id: uuidv4(),
+        attachments: [],
+        body: base64String,
+        contentType: 'image',
+        createdAt: fSub({ minutes: 1 }),
+        senderId: myContact.id,
+      };
+
+      try {
+        if (selectedConversationId) {
+          await sendMessage(selectedConversationId, fileMessageData);
+        } else {
+          const fileConversationData = {
+            id: uuidv4(),
+            messages: [fileMessageData],
+            participants: [...recipients, myContact],
+            type: recipients.length > 1 ? 'GROUP' : 'ONE_TO_ONE',
+            unreadCount: 0,
+          };
+          const res = await createConversation(fileConversationData);
+          router.push(`${paths.dashboard.chat}?id=${res.conversation.id}`);
+          onAddRecipients([]);
+        }
+      } catch (error) {
+        console.error('Failed to send file:', error);
+      }
+    };
+    reader.readAsDataURL(file);
+
+    if (fileRef.current) {
+      fileRef.current.value = '';
+    }
+  }, [myContact, recipients, router, selectedConversationId, onAddRecipients]);
+
+
 
   const messageData = useMemo(
     () => ({
@@ -124,7 +202,7 @@ export function ChatMessageInput({
         placeholder="Type a message"
         disabled={disabled}
         startAdornment={
-          <IconButton>
+          <IconButton onClick={handleOpenEmoji}>
             <Iconify icon="eva:smiling-face-fill" />
           </IconButton>
         }
@@ -149,7 +227,57 @@ export function ChatMessageInput({
         }}
       />
 
-      <input type="file" ref={fileRef} style={{ display: 'none' }} />
+      <input
+        type="file"
+        ref={fileRef}
+        onChange={handleFileChange}
+        style={{ display: 'none' }}
+        accept="image/*"
+      />
+
+      <Popover
+        open={Boolean(emojiAnchor)}
+        anchorEl={emojiAnchor}
+        onClose={handleCloseEmoji}
+        anchorOrigin={{
+          vertical: 'top',
+          horizontal: 'left',
+        }}
+        transformOrigin={{
+          vertical: 'bottom',
+          horizontal: 'left',
+        }}
+        slotProps={{
+          paper: {
+            sx: {
+              p: 1.5,
+              width: 320,
+              maxHeight: 240,
+              display: 'grid',
+              gridTemplateColumns: 'repeat(8, 1fr)',
+              gap: 0.75,
+              overflowY: 'auto',
+            },
+          },
+        }}
+      >
+        {EMOJIS.map((emoji) => (
+          <IconButton
+            key={emoji}
+            onClick={() => handleSelectEmoji(emoji)}
+            sx={{
+              fontSize: 20,
+              p: 0.5,
+              borderRadius: 1,
+              '&:hover': {
+                bgcolor: 'action.hover',
+              },
+            }}
+          >
+            {emoji}
+          </IconButton>
+        ))}
+      </Popover>
     </>
   );
 }

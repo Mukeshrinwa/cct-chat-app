@@ -245,6 +245,10 @@ async function fetchConversationDetail(conversationId: string, currentUser: any)
     contentType: msg.type || msg.messageType || 'text',
     createdAt: msg.createdAt || new Date().toISOString(),
     attachments: msg.attachments || [],
+    isDeleted: msg.isDeleted || false,
+    deleteType: msg.deleteType,
+    reactions: msg.reactions || [],
+    editedAt: msg.editedAt,
   }));
 
   // 4. Resolve users list to map participants properly
@@ -489,3 +493,74 @@ export async function clickConversation(conversationId: string) {
 
   mutate('/api/v1/chats/conversations');
 }
+
+// ----------------------------------------------------------------------
+
+export async function deleteMessage(messageId: string, deleteType: 'everyone' | 'me', conversationId?: string) {
+  try {
+    await axios.delete(`/api/v1/chats/message/${messageId}`, {
+      data: { deleteType },
+    });
+    if (conversationId) {
+      mutate(`/api/v1/chats/conversations/${conversationId}`);
+    }
+    mutate('/api/v1/chats/conversations');
+  } catch (error) {
+    console.error('Failed to delete message:', error);
+    throw error;
+  }
+}
+
+// ----------------------------------------------------------------------
+
+export async function editMessage(messageId: string, text: string, attachments: any[] = [], conversationId?: string) {
+  try {
+    await axios.put(`/api/v1/chats/message/${messageId}`, {
+      text,
+      attachments,
+    });
+    if (conversationId) {
+      mutate(`/api/v1/chats/conversations/${conversationId}`);
+    }
+    mutate('/api/v1/chats/conversations');
+  } catch (error) {
+    console.error('Failed to edit message:', error);
+    throw error;
+  }
+}
+
+// ----------------------------------------------------------------------
+
+export async function reactToMessage(messageId: string, emoji: string, conversationId?: string) {
+  try {
+    await axios.post(`/api/v1/chats/message/${messageId}/react`, {
+      emoji,
+    });
+    if (conversationId) {
+      mutate(`/api/v1/chats/conversations/${conversationId}`);
+    }
+    mutate('/api/v1/chats/conversations');
+  } catch (error) {
+    console.error('Failed to react to message:', error);
+    throw error;
+  }
+}
+
+// ----------------------------------------------------------------------
+
+export async function forwardMessage(messageId: string, conversationIds: string[]) {
+  try {
+    await axios.post('/api/v1/chats/messages/forward', {
+      messageId,
+      conversationIds,
+    });
+    conversationIds.forEach((id) => {
+      mutate(`/api/v1/chats/conversations/${id}`);
+    });
+    mutate('/api/v1/chats/conversations');
+  } catch (error) {
+    console.error('Failed to forward message:', error);
+    throw error;
+  }
+}
+

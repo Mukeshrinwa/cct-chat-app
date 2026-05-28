@@ -27,6 +27,7 @@ import { ChatNavItem } from './chat-nav-item';
 import { ChatNavAccount } from './chat-nav-account';
 import { ChatNavItemSkeleton } from './chat-skeleton';
 import { ChatNavSearchResults } from './chat-nav-search-results';
+import { ChatGroupCreateDialog } from './chat-group-create-dialog';
 
 import type { UseNavCollapseReturn } from './hooks/use-collapse-nav';
 
@@ -83,6 +84,8 @@ export function ChatNav({
     collapseDesktop,
     onCollapseDesktop,
   } = collapseNav;
+
+  const [groupCreateOpen, setGroupCreateOpen] = useState(false);
 
   const [searchContacts, setSearchContacts] = useState<{
     query: string;
@@ -225,9 +228,14 @@ export function ChatNav({
         </IconButton>
 
         {!collapseDesktop && (
-          <IconButton onClick={handleClickCompose}>
-            <Iconify width={24} icon="solar:user-plus-bold" />
-          </IconButton>
+          <Stack direction="row" spacing={0.5}>
+            <IconButton onClick={() => setGroupCreateOpen(true)} title="Create Group">
+              <Iconify width={24} icon="solar:users-group-two-rounded-bold" />
+            </IconButton>
+            <IconButton onClick={handleClickCompose} title="New Chat">
+              <Iconify width={24} icon="solar:user-plus-bold" />
+            </IconButton>
+          </Stack>
         )}
       </Stack>
 
@@ -273,6 +281,13 @@ export function ChatNav({
       >
         {renderContent}
       </Drawer>
+
+      {groupCreateOpen && (
+        <ChatGroupCreateDialog
+          open={groupCreateOpen}
+          onClose={() => setGroupCreateOpen(false)}
+        />
+      )}
     </>
   );
 }

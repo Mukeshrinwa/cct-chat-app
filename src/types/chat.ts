@@ -19,6 +19,10 @@ export type IChatMessage = {
   contentType: string;
   createdAt: IDateValue;
   attachments: IChatAttachment[];
+  isDeleted?: boolean;
+  deleteType?: 'everyone' | 'me';
+  reactions?: Array<{ emoji: string; senderId: string; username?: string }>;
+  editedAt?: IDateValue;
 };
 
 export type IChatParticipant = {

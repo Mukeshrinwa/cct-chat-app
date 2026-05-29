@@ -10,6 +10,7 @@ import { useRouter, useSearchParams } from 'src/routes/hooks';
 import { useGroupSockets } from 'src/hooks/use-group-sockets';
 
 import { CONFIG } from 'src/config-global';
+import { useChatStore } from 'src/store/useChatStore';
 import { useGetContacts, useGetConversation, useGetConversations } from 'src/actions/chat';
 
 import { EmptyContent } from 'src/components/empty-content';
@@ -31,6 +32,8 @@ export function ChatView() {
   const router = useRouter();
 
   const { user } = useMockedUser();
+
+  const { setActiveConversation } = useChatStore();
 
   // Group socket events sun-ta hai — group create/delete/call sab handle karta hai
   useGroupSockets(user?.id);
@@ -58,6 +61,10 @@ export function ChatView() {
       (participant: IChatParticipant) => participant.id !== `${user?.id}`
     )
     : [];
+
+  useEffect(() => {
+    setActiveConversation(selectedConversationId || null);
+  }, [selectedConversationId, setActiveConversation]);
 
   useEffect(() => {
     if (conversationError || !selectedConversationId) {

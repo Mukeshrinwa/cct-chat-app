@@ -18,6 +18,7 @@ import DialogActions from '@mui/material/DialogActions';
 import { useSearchParams } from 'src/routes/hooks';
 
 import { fToNow } from 'src/utils/format-time';
+import { getMediaUrl } from 'src/utils/chat-utils';
 
 import { editMessage, deleteMessage, reactToMessage } from 'src/actions/chat';
 
@@ -50,6 +51,9 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
 
   const { firstName, avatarUrl } = senderDetails;
   const { body, createdAt } = message;
+
+  const imageUrl = message.attachments?.[0]?.preview || getMediaUrl(body);
+  const audioUrl = message.attachments?.[0]?.preview || getMediaUrl(body);
 
   // Edit State
   const [isEditing, setIsEditing] = useState(false);
@@ -232,8 +236,8 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
         <Box
           component="img"
           alt="attachment"
-          src={body}
-          onClick={() => onOpenLightbox(body)}
+          src={imageUrl}
+          onClick={() => onOpenLightbox(imageUrl)}
           sx={{
             width: 400,
             height: 'auto',
@@ -247,7 +251,7 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
       ) : message.contentType === 'audio' || (message as any).type === 'audio' || (typeof body === 'string' && body.startsWith('data:audio/')) ? (
         <Box sx={{ width: 280, pt: 1 }}>
           {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-          <audio controls src={body} style={{ width: '100%', height: 40, outline: 'none' }} />
+          <audio controls src={audioUrl} style={{ width: '100%', height: 40, outline: 'none' }} />
         </Box>
       ) : (
         body

@@ -77,7 +77,7 @@ export function ChatForwardDialog({ open, onClose, messageId }: Props) {
   };
 
   const handleForward = async () => {
-    if (selectedIds.length === 0) return;
+    if (selectedIds.length === 0 || loading) return;
     try {
       setLoading(true);
       await forwardMessage(messageId, selectedIds);
@@ -192,7 +192,7 @@ export function ChatForwardDialog({ open, onClose, messageId }: Props) {
           color="primary"
           onClick={handleForward}
           loading={loading}
-          disabled={selectedIds.length === 0}
+          disabled={selectedIds.length === 0 || loading}
         >
           Forward {selectedIds.length > 0 && `(${selectedIds.length})`}
         </LoadingButton>

@@ -1,4 +1,16 @@
+import { CONFIG } from 'src/config-global';
+
 // ----------------------------------------------------------------------
+
+export const getMediaUrl = (url: string) => {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
+    return url;
+  }
+  const baseUrl = CONFIG.site.assetURL || CONFIG.site.serverUrl || '';
+  const cleanUrl = url.startsWith('/') ? url : `/${url}`;
+  return `${baseUrl}${cleanUrl}`;
+};
 
 interface PopulatedUser {
   _id?: string;
@@ -28,6 +40,21 @@ export const normalizeMessage = (message: Record<string, any>) => {
     return undefined;
   })();
 
+  const rawAttachments = message.attachments || [];
+  const normalizedAttachments = rawAttachments.map((att: any) => {
+    const rawUrl = att.url || att.path || att.preview || '';
+    const formattedUrl = getMediaUrl(rawUrl);
+    return {
+      name: att.fileName || att.name || 'Attachment',
+      size: att.size || 0,
+      type: att.mimeType || att.type || '',
+      path: formattedUrl,
+      preview: formattedUrl,
+      createdAt: att.createdAt || message.createdAt || new Date().toISOString(),
+      modifiedAt: att.modifiedAt || message.createdAt || new Date().toISOString(),
+    };
+  });
+
   return {
     ...message,
     _id: message._id,
@@ -40,6 +67,7 @@ export const normalizeMessage = (message: Record<string, any>) => {
     messageType: message.messageType || message.type || message.fileType || 'text',
     status: message.status || message.deliveryStatus || 'sent',
     reactions: message.reactions || [],
+    attachments: normalizedAttachments,
     isForwarded: !!message.isForwarded,
     forwardedFrom: message.forwardedFrom || '',
     parentMessageId: message.parentMessageId || null,

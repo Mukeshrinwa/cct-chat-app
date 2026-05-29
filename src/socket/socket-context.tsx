@@ -69,6 +69,8 @@ export function SocketProvider({ children }: SocketProviderProps) {
     [user]
   );
 
+  const activeConversationId = useChatStore((state) => state.activeConversationId);
+
   // Sync auth store with current JWT context so other stores can access token
   useEffect(() => {
     if (user && token) {
@@ -78,6 +80,16 @@ export function SocketProvider({ children }: SocketProviderProps) {
       }
     }
   }, [user, token]);
+
+  // Join room when active conversation changes
+  useEffect(() => {
+    const socketInstance = socketManager.getSocket();
+    if (socketInstance && isConnected && activeConversationId) {
+      console.log(`[SOCKET_EXPLICIT_JOIN] Emitting join_conversation room: ${activeConversationId}`);
+      socketInstance.emit('join_conversation', { conversationId: activeConversationId });
+      socketInstance.emit('mark_read', { conversationId: activeConversationId });
+    }
+  }, [activeConversationId, isConnected]);
 
   // Connect socket when token changes/is available
   useEffect(() => {
@@ -171,48 +183,40 @@ export function SocketProvider({ children }: SocketProviderProps) {
     socketInstance.on('new_message', (data: any) => {
       // Try normalizing as reference project format first
       const normalized = normalizeMessage(data);
+      if (!normalized) return;
 
-      if (normalized) {
-        const loggedInUserId = currentUserId;
+      const loggedInUserId = currentUserId;
 
-        const activeConvId = useChatStore.getState().activeConversationId;
-        const matchingConv = useChatStore
-          .getState()
-          .conversations.find((c) => c._id === normalized.conversationId);
+      const activeConvId = useChatStore.getState().activeConversationId;
+      const matchingConv = useChatStore
+        .getState()
+        .conversations.find((c) => c._id === normalized.conversationId);
 
-        console.log('[NEW_MESSAGE] Socket event:', {
-          messageId: normalized.messageId,
-          conversationId: normalized.conversationId,
-          senderId: normalized.senderId,
-          loggedInUserId,
-          activeConvId,
-          foundConv: !!matchingConv,
-        });
+      console.log('[NEW_MESSAGE] Socket event:', {
+        messageId: normalized.messageId,
+        conversationId: normalized.conversationId,
+        senderId: normalized.senderId,
+        loggedInUserId,
+        activeConvId,
+        foundConv: !!matchingConv,
+      });
 
-        // Update zustand store unread count + last message
-        useChatStore
-          .getState()
-          .updateConversationLastMessage(normalized.conversationId!, normalized, loggedInUserId);
-      }
+      // Update zustand store unread count + last message
+      useChatStore
+        .getState()
+        .updateConversationLastMessage(normalized.conversationId!, normalized, loggedInUserId);
 
-      // Also mutate SWR cache for live message list update
-      const { message, sender, conversationId, attachments, timestamp } = data;
-      const senderId =
-        typeof sender === 'object' && sender ? sender._id || sender.id || '' : sender || '';
-      const messageBody =
-        typeof message === 'object' && message
-          ? message.text || message.message || ''
-          : message || '';
+      const { conversationId, senderId } = normalized;
 
       const parsedMessage = {
-        id: message?.messageId || message?._id || data.messageId || data._id || String(Date.now()),
-        body: messageBody,
+        id: normalized.messageId,
+        body: normalized.text,
         senderId,
-        contentType: message?.type || message?.messageType || 'text',
-        createdAt: timestamp || message?.createdAt || new Date().toISOString(),
-        attachments: attachments || message?.attachments || [],
-        isDeleted: false,
-        reactions: [],
+        contentType: normalized.messageType,
+        createdAt: normalized.createdAt,
+        attachments: (normalized as any).attachments || [],
+        isDeleted: normalized.isDeletedForEveryone || false,
+        reactions: normalized.reactions || [],
       };
 
       if (conversationId) {

@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import useSWR, { mutate } from 'swr';
 
 import { keyBy } from 'src/utils/helper';
+import { normalizeMessage } from 'src/utils/chat-utils';
 import axios, { fetcher, endpoints } from 'src/utils/axios';
 
 import { socketService } from 'src/socket/socket-service';
@@ -279,18 +280,21 @@ async function fetchConversationDetail(conversationId: string, currentUser: any)
   }
 
   // 3. Map messages to IChatMessage
-  const mappedMessages = messages.map((msg: any) => ({
-    id: msg.messageId || msg._id || '',
-    body: msg.text || msg.message || '',
-    senderId: msg.senderId || msg.senderDetails?._id || '',
-    contentType: msg.type || msg.messageType || 'text',
-    createdAt: msg.createdAt || new Date().toISOString(),
-    attachments: msg.attachments || [],
-    isDeleted: msg.isDeleted || false,
-    deleteType: msg.deleteType,
-    reactions: msg.reactions || [],
-    editedAt: msg.editedAt,
-  }));
+  const mappedMessages = messages.map((msg: any) => {
+    const normalized = normalizeMessage(msg);
+    return {
+      id: normalized?.messageId || '',
+      body: normalized?.text || '',
+      senderId: normalized?.senderId || '',
+      contentType: normalized?.messageType || 'text',
+      createdAt: normalized?.createdAt || new Date().toISOString(),
+      attachments: normalized?.attachments || [],
+      isDeleted: normalized?.isDeletedForEveryone || false,
+      deleteType: msg.deleteType,
+      reactions: normalized?.reactions || [],
+      editedAt: msg.editedAt,
+    };
+  });
 
   // 4. Resolve users list to map participants properly
   let usersList: any[] = [];
@@ -476,7 +480,7 @@ export async function sendMessage(conversationId: string, messageData: IChatMess
     const checkRes = await axios.get(`/api/v1/chats/check/${conversationId}`);
     if (checkRes.data && checkRes.data.exists) {
       realConvId = checkRes.data.conversationId;
-    } else if (checkRes.data && !checkRes.data.exists) {
+    } else if (checkRes.data && !checkRes.data.exists && checkRes.data.otherUser) {
       // Create new conversation
       const createRes = await axios.post('/api/v1/chats/conversations', {
         recipientId: conversationId,
@@ -664,9 +668,16 @@ export async function createConversation(conversationData: any) {
   };
 }
 
-// ----------------------------------------------------------------------
+const lastClickedRead: Record<string, number> = {};
 
 export async function clickConversation(conversationId: string) {
+  const now = Date.now();
+  if (lastClickedRead[conversationId] && now - lastClickedRead[conversationId] < 1000) {
+    console.log('Duplicate clickConversation call ignored to prevent double API requests');
+    return;
+  }
+  lastClickedRead[conversationId] = now;
+
   try {
     if (socketService.isConnected()) {
       await socketService.emit('mark_read', { conversationId });

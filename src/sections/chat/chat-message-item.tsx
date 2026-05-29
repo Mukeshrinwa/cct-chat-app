@@ -117,11 +117,43 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
 
   const emojisList = ['❤️', '👍', '😂', '😮', '😢', '🙏', '🎉', '🔥'];
 
+  let tickIcon = 'eva:checkmark-fill';
+  let tickColor = 'text.disabled';
+
+  if (me) {
+    if (message.status === 'read') {
+      tickIcon = 'eva:done-all-fill';
+      tickColor = '#34B7F1';
+    } else if (message.status === 'delivered') {
+      tickIcon = 'eva:done-all-fill';
+      tickColor = 'text.disabled';
+    } else if (message.status === 'sent') {
+      tickIcon = 'eva:checkmark-fill';
+      tickColor = 'text.disabled';
+    } else {
+      // Fallback if status is not explicitly set by backend yet
+      const isOtherParticipantOnline = participants.some(
+        (p) => p.id !== user?.id && p.status === 'online'
+      );
+      if (isOtherParticipantOnline) {
+        tickIcon = 'eva:done-all-fill'; // Delivered
+        tickColor = 'text.disabled';
+      }
+    }
+  }
+
   const renderInfo = (
     <Typography
       noWrap
       variant="caption"
-      sx={{ mb: 1, color: 'text.disabled', ...(!me && { mr: 'auto' }) }}
+      sx={{
+        mb: 1,
+        color: 'text.disabled',
+        display: 'flex',
+        alignItems: 'center',
+        ...(!me && { mr: 'auto' }),
+        ...(me && { ml: 'auto', justifyContent: 'flex-end' }),
+      }}
     >
       {!me && `${firstName}, `}
       {fToNow(createdAt)}
@@ -129,6 +161,13 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
         <Box component="span" sx={{ ml: 1, fontStyle: 'italic', opacity: 0.8 }}>
           (edited)
         </Box>
+      )}
+      {me && (
+        <Iconify
+          icon={tickIcon}
+          width={16}
+          sx={{ ml: 0.5, color: tickColor }}
+        />
       )}
     </Typography>
   );
@@ -205,6 +244,11 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
             '&:hover': { opacity: 0.9 },
           }}
         />
+      ) : message.contentType === 'audio' || (message as any).type === 'audio' || (typeof body === 'string' && body.startsWith('data:audio/')) ? (
+        <Box sx={{ width: 280, pt: 1 }}>
+          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+          <audio controls src={body} style={{ width: '100%', height: 40, outline: 'none' }} />
+        </Box>
       ) : (
         body
       )}

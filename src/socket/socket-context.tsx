@@ -9,6 +9,9 @@ import { useAuthContext } from 'src/auth/hooks';
 import { socketService } from './socket-service';
 
 // ----------------------------------------------------------------------
+// NOTE: Call state is fully managed by CallContext (src/call/call-context.tsx)
+// This context only handles chat/messaging socket events.
+// ----------------------------------------------------------------------
 
 interface SocketContextType {
   socket: Socket | null;
@@ -16,8 +19,7 @@ interface SocketContextType {
   typingUsers: Record<string, string[]>; // conversationId -> userIds[]
   recordingUsers: Record<string, string[]>; // conversationId -> userIds[]
   onlineUsers: Set<string>;
-  activeCall: CallState | null;
-  
+
   sendMessage: (payload: { messageId: string; conversationId: string; text: string }) => void;
   startTyping: (payload: { conversationId: string }) => void;
   markRead: (payload: { conversationId: string }) => void;
@@ -28,16 +30,6 @@ interface SocketContextType {
   acceptCall: (payload: { roomName: string }) => void;
   rejectCall: (payload: { roomName: string }) => void;
   createGroup: (payload: { name: string; participants: string[] }) => void;
-}
-
-export interface CallState {
-  roomName?: string;
-  roomId?: string;
-  groupId?: string;
-  initiatedBy?: string;
-  participants?: string[];
-  callType?: 'audio' | 'video';
-  status: 'idle' | 'calling' | 'incoming' | 'connected' | 'ended';
 }
 
 const SocketContext = createContext<SocketContextType | undefined>(undefined);
@@ -60,7 +52,6 @@ export function SocketProvider({ children }: SocketProviderProps) {
   const [typingUsers, setTypingUsers] = useState<Record<string, string[]>>({});
   const [recordingUsers, setRecordingUsers] = useState<Record<string, string[]>>({});
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
-  const [activeCall, setActiveCall] = useState<CallState | null>(null);
 
   const currentUserId = useMemo(() => user?._id || user?.id || '', [user]);
   const token = useMemo(() => user?.accessToken || sessionStorage.getItem('jwt_access_token') || '', [user]);
@@ -227,12 +218,12 @@ export function SocketProvider({ children }: SocketProviderProps) {
     // 6. user_blocked / user_unblocked
     socket.on('user_blocked', (payload: { targetUserId: string }) => {
       toast.error(`You have been blocked by user ${payload.targetUserId}`);
-      mutate(endpoints => true); // Revalidate everything
+      mutate((_endpoints: any) => true); // Revalidate everything
     });
 
     socket.on('user_unblocked', (payload: { targetUserId: string }) => {
       toast.success(`You have been unblocked by user ${payload.targetUserId}`);
-      mutate(endpoints => true); // Revalidate everything
+      mutate((_endpoints: any) => true); // Revalidate everything
     });
 
     // 7. presence_hidden / presence_restored
@@ -252,72 +243,13 @@ export function SocketProvider({ children }: SocketProviderProps) {
       });
     });
 
-    // 8. call_accepted
-    socket.on('call_accepted', (payload: { userId: string; roomName: string }) => {
-      setActiveCall((prev) => prev ? { ...prev, status: 'connected', roomName: payload.roomName } : null);
-      toast.success(`Call accepted by user`);
-    });
-
-    // 9. call_answered_elsewhere
-    socket.on('call_answered_elsewhere', (payload: { roomName: string }) => {
-      setActiveCall(null);
-      toast.info(`Call answered on another device`);
-    });
-
-    // 10. call_missed
-    socket.on('call_missed', (payload: { roomName: string }) => {
-      setActiveCall(null);
-      toast.warning(`Call missed`);
-    });
-
-    // 11. group_call_started
-    socket.on('group_call_started', (payload: { groupId: string; roomId: string; initiatedBy: string }) => {
-      setActiveCall({
-        groupId: payload.groupId,
-        roomId: payload.roomId,
-        initiatedBy: payload.initiatedBy,
-        status: 'incoming',
-        callType: 'video',
-      });
-      toast.info(`Group call started`);
-    });
-
-    // 12. group_call_ended
-    socket.on('group_call_ended', (payload: { roomId: string }) => {
-      setActiveCall(null);
-      toast.info(`Group call ended`);
-    });
-
-    // 13. participant_joined / participant_left
-    socket.on('participant_joined', (payload: { roomId: string; userId: string; user: any }) => {
-      setActiveCall((prev) => {
-        if (!prev) return prev;
-        const currentParticipants = prev.participants || [];
-        if (currentParticipants.includes(payload.userId)) return prev;
-        return {
-          ...prev,
-          participants: [...currentParticipants, payload.userId],
-        };
-      });
-      toast.info(`Participant joined the call`);
-    });
-
-    socket.on('participant_left', (payload: { roomId: string; userId: string }) => {
-      setActiveCall((prev) => {
-        if (!prev) return prev;
-        const currentParticipants = prev.participants || [];
-        return {
-          ...prev,
-          participants: currentParticipants.filter((id) => id !== payload.userId),
-        };
-      });
-      toast.info(`Participant left the call`);
-    });
-
-    // 14. upload_completed
-    socket.on('upload_completed', (payload: { uploadId: string; message: any }) => {
+    // 8. upload_completed
+    socket.on('upload_completed', (_payload: { uploadId: string; message: any }) => {
       mutate('/api/v1/chats/conversations');
     });
+
+    // NOTE: call_* events (incoming_call, call_accepted, call_ringing, etc.)
+    // are intentionally NOT handled here — they are handled in CallContext.
 
     // Cleanup listeners
     return () => {
@@ -332,13 +264,6 @@ export function SocketProvider({ children }: SocketProviderProps) {
       socket.off('user_unblocked');
       socket.off('presence_hidden');
       socket.off('presence_restored');
-      socket.off('call_accepted');
-      socket.off('call_answered_elsewhere');
-      socket.off('call_missed');
-      socket.off('group_call_started');
-      socket.off('group_call_ended');
-      socket.off('participant_joined');
-      socket.off('participant_left');
       socket.off('upload_completed');
       
       Object.values(typingTimeouts).forEach(clearTimeout);
@@ -371,22 +296,16 @@ export function SocketProvider({ children }: SocketProviderProps) {
     socketService.emit('recording_stop', payload);
   };
 
+  // These are thin pass-throughs — actual state management is in CallContext
   const callUser = (payload: { participants: string[]; callType: 'audio' | 'video' }) => {
-    setActiveCall({
-      participants: payload.participants,
-      callType: payload.callType,
-      status: 'calling',
-    });
     socketService.emit('call_user', payload);
   };
 
   const acceptCall = (payload: { roomName: string }) => {
-    setActiveCall((prev) => prev ? { ...prev, status: 'connected', roomName: payload.roomName } : null);
     socketService.emit('accept_call', payload);
   };
 
   const rejectCall = (payload: { roomName: string }) => {
-    setActiveCall(null);
     socketService.emit('reject_call', payload);
   };
 
@@ -401,7 +320,6 @@ export function SocketProvider({ children }: SocketProviderProps) {
       typingUsers,
       recordingUsers,
       onlineUsers,
-      activeCall,
       sendMessage,
       startTyping,
       markRead,
@@ -413,7 +331,7 @@ export function SocketProvider({ children }: SocketProviderProps) {
       rejectCall,
       createGroup,
     }),
-    [isConnected, typingUsers, recordingUsers, onlineUsers, activeCall]
+    [isConnected, typingUsers, recordingUsers, onlineUsers]
   );
 
   return <SocketContext.Provider value={memoizedValue}>{children}</SocketContext.Provider>;

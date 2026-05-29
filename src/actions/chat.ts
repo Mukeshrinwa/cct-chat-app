@@ -23,13 +23,13 @@ const swrOptions = {
 function mapUserToParticipant(user: any): IChatParticipant {
   return {
     id: user._id || user.id || '',
-    name: user.name || '',
+    name: user.name || user.displayName || 'User',
     username: user.username || '',
     role: user.role || 'user',
     email: user.email || '',
     address: user.address || '',
-    avatarUrl: user.avatar || '',
-    phoneNumber: user.mobile || '',
+    avatarUrl: user.avatar || user.photoURL || '',
+    phoneNumber: user.mobile || user.phoneNumber || '',
     lastActivity: user.lastSeen || new Date().toISOString(),
     status: user.lastSeen === 'online' ? 'online' : 'offline',
   };
@@ -97,9 +97,10 @@ export function useGetConversations() {
       const participantsList: IChatParticipant[] = [];
 
       if (conv.participants && Array.isArray(conv.participants)) {
-        conv.participants.forEach((pId: string) => {
-          if (pId !== user?.id) {
-            const resolvedUser = usersMap.get(pId);
+        conv.participants.forEach((p: any) => {
+          const pId = typeof p === 'object' && p ? p._id || p.id : p;
+          if (pId && pId !== user?.id) {
+            const resolvedUser = usersMap.get(pId) || (typeof p === 'object' ? p : null);
             if (resolvedUser) {
               participantsList.push(mapUserToParticipant(resolvedUser));
             } else if (conv.otherUser && (conv.otherUser._id === pId || conv.otherUser.id === pId)) {
@@ -128,18 +129,35 @@ export function useGetConversations() {
 
       // Ensure singleParticipant is never undefined
       if (participantsList.length === 0) {
-        participantsList.push({
-          id: 'dummy-participant',
-          name: 'Chat Participant',
-          username: '',
-          role: 'user',
-          email: '',
-          address: '',
-          avatarUrl: '',
-          phoneNumber: '',
-          lastActivity: new Date().toISOString(),
-          status: 'offline',
-        });
+        if (conv.otherUser) {
+          participantsList.push(mapUserToParticipant(conv.otherUser));
+        } else if (user) {
+          participantsList.push({
+            id: user.id,
+            name: user.displayName,
+            username: (user as any).username || '',
+            role: user.role || 'user',
+            email: user.email || '',
+            address: user.address || '',
+            avatarUrl: user.photoURL || '',
+            phoneNumber: user.phoneNumber || '',
+            lastActivity: new Date().toISOString(),
+            status: 'online',
+          });
+        } else {
+          participantsList.push({
+            id: 'dummy-participant',
+            name: 'User',
+            username: '',
+            role: 'user',
+            email: '',
+            address: '',
+            avatarUrl: '',
+            phoneNumber: '',
+            lastActivity: new Date().toISOString(),
+            status: 'offline',
+          });
+        }
       }
 
       if (user) {
@@ -225,6 +243,32 @@ async function fetchConversationDetail(conversationId: string, currentUser: any)
     console.log('Not a recipient ID or check failed:', e);
   }
 
+  // 1b. If not a recipient ID, try to load conversation details directly
+  if (!conversationData && realConvId) {
+    try {
+      const convRes = await axios.get(`/api/v1/chats/conversations/${realConvId}`);
+      if (convRes.data) {
+        conversationData = convRes.data.data || convRes.data.conversation || convRes.data;
+      }
+    } catch (e) {
+      console.log('Failed to fetch conversation details directly:', e);
+    }
+  }
+
+  // 1c. If still null, try to load from the conversations list
+  if (!conversationData && realConvId) {
+    try {
+      const convListRes = await axios.get('/api/v1/chats/conversations');
+      const convList = convListRes.data?.data || convListRes.data || [];
+      const foundConv = convList.find((c: any) => c._id === realConvId || c.id === realConvId);
+      if (foundConv) {
+        conversationData = foundConv;
+      }
+    } catch (e) {
+      console.log('Failed to fetch conversation list for fallback:', e);
+    }
+  }
+
   // 2. Fetch messages
   let messages: any[] = [];
   try {
@@ -262,21 +306,47 @@ async function fetchConversationDetail(conversationId: string, currentUser: any)
     usersMap.set(u._id || u.id, u);
   });
 
+  const conversationParticipantsMap = new Map();
+  if (conversationData && Array.isArray(conversationData.participants)) {
+    conversationData.participants.forEach((p: any) => {
+      if (p && typeof p === 'object') {
+        const id = p._id || p.id;
+        if (id) conversationParticipantsMap.set(id, p);
+      }
+    });
+  }
+
+  const messageUsersMap = new Map();
+  messages.forEach((msg: any) => {
+    if (msg.senderDetails && typeof msg.senderDetails === 'object') {
+      const sId = msg.senderDetails._id || msg.senderDetails.id;
+      if (sId) messageUsersMap.set(sId, msg.senderDetails);
+    }
+    if (msg.recipientDetails && typeof msg.recipientDetails === 'object') {
+      const rId = msg.recipientDetails._id || msg.recipientDetails.id;
+      if (rId) messageUsersMap.set(rId, msg.recipientDetails);
+    }
+  });
+
   const participantIds = new Set<string>();
 
   if (conversationData && Array.isArray(conversationData.participants)) {
     conversationData.participants.forEach((p: any) => {
-      participantIds.add(typeof p === 'object' && p ? p._id || p.id : p);
+      const pId = typeof p === 'object' && p ? p._id || p.id : p;
+      if (pId && typeof pId === 'string') participantIds.add(pId);
     });
   }
 
   messages.forEach((msg: any) => {
-    if (msg.senderId) participantIds.add(msg.senderId);
-    if (msg.recipientId) participantIds.add(msg.recipientId);
+    const sId = msg.senderId || msg.senderDetails?._id || msg.sender?._id || msg.sender;
+    const rId = msg.recipientId || msg.recipientDetails?._id || msg.recipient?._id || msg.recipient;
+    if (sId && typeof sId === 'string') participantIds.add(sId);
+    if (rId && typeof rId === 'string') participantIds.add(rId);
   });
 
   if (otherUser) {
-    participantIds.add(otherUser._id || otherUser.id);
+    const oId = otherUser._id || otherUser.id;
+    if (oId && typeof oId === 'string') participantIds.add(oId);
   }
 
   const participants: IChatParticipant[] = [];
@@ -296,7 +366,7 @@ async function fetchConversationDetail(conversationId: string, currentUser: any)
         status: 'online',
       });
     } else {
-      const resolvedUser = usersMap.get(pId);
+      const resolvedUser = usersMap.get(pId) || conversationParticipantsMap.get(pId) || messageUsersMap.get(pId);
       if (resolvedUser) {
         participants.push(mapUserToParticipant(resolvedUser));
       } else if (otherUser && (otherUser._id === pId || otherUser.id === pId)) {
@@ -341,18 +411,22 @@ async function fetchConversationDetail(conversationId: string, currentUser: any)
   // Ensure singleParticipant fallback is met
   const otherParticipants = participants.filter((p) => p.id !== currentUser?.id);
   if (otherParticipants.length === 0) {
-    participants.push({
-      id: 'dummy-participant',
-      name: 'Chat Participant',
-      username: '',
-      role: 'user',
-      email: '',
-      address: '',
-      avatarUrl: '',
-      phoneNumber: '',
-      lastActivity: new Date().toISOString(),
-      status: 'offline',
-    });
+    if (currentUser) {
+      // Self-chat or no other participant, let's keep currentUser
+    } else {
+      participants.push({
+        id: 'dummy-participant',
+        name: 'User',
+        username: '',
+        role: 'user',
+        email: '',
+        address: '',
+        avatarUrl: '',
+        phoneNumber: '',
+        lastActivity: new Date().toISOString(),
+        status: 'offline',
+      });
+    }
   }
 
   return {
@@ -552,23 +626,21 @@ export async function createConversation(conversationData: any) {
 // ----------------------------------------------------------------------
 
 export async function clickConversation(conversationId: string) {
-  let socketSent = false;
   try {
     if (socketService.isConnected()) {
       await socketService.emit('mark_read', { conversationId });
-      socketSent = true;
       console.log('Marked read via socket');
     }
   } catch (error) {
-    console.error('Socket mark_read failed, falling back to HTTP API:', error);
+    console.error('Socket mark_read failed:', error);
   }
 
-  if (!socketSent) {
-    try {
-      await axios.post(`/api/v1/chats/read/${conversationId}`);
-    } catch (error) {
-      console.error('Failed to mark conversation as read via HTTP API:', error);
-    }
+  // Always hit the HTTP API to ensure the backend marks it as read
+  try {
+    await axios.post(`/api/v1/chats/read/${conversationId}`);
+    console.log('Marked read via HTTP API');
+  } catch (error) {
+    console.error('Failed to mark conversation as read via HTTP API:', error);
   }
 
   mutate('/api/v1/chats/conversations');

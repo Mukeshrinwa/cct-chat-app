@@ -6,6 +6,7 @@ import { Router } from 'src/routes/sections';
 
 import { useScrollToTop } from 'src/hooks/use-scroll-to-top';
 
+import { CallRoot } from 'src/call';
 import { CONFIG } from 'src/config-global';
 import { SocketProvider } from 'src/socket';
 import { LocalizationProvider } from 'src/locales';
@@ -40,16 +41,19 @@ export default function App() {
       <LocalizationProvider>
         <AuthProvider>
           <SocketProvider>
-            <SettingsProvider settings={defaultSettings}>
-              <ThemeProvider>
-                <MotionLazy>
+            {/* CallRoot provides CallContext + global call overlays */}
+            <CallRoot>
+              <SettingsProvider settings={defaultSettings}>
+                <ThemeProvider>
+                  <MotionLazy>
                     <Snackbar />
                     <ProgressBar />
                     <SettingsDrawer />
                     <Router />
-                </MotionLazy>
-              </ThemeProvider>
-            </SettingsProvider>
+                  </MotionLazy>
+                </ThemeProvider>
+              </SettingsProvider>
+            </CallRoot>
           </SocketProvider>
         </AuthProvider>
       </LocalizationProvider>

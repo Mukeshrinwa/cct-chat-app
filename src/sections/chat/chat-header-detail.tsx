@@ -12,9 +12,14 @@ import IconButton from '@mui/material/IconButton';
 import ListItemText from '@mui/material/ListItemText';
 import AvatarGroup, { avatarGroupClasses } from '@mui/material/AvatarGroup';
 
+import { useSearchParams } from 'src/routes/hooks';
+
 import { useResponsive } from 'src/hooks/use-responsive';
 
 import { fToNow } from 'src/utils/format-time';
+
+import { useCall } from 'src/call';
+import { useSocket } from 'src/socket';
 
 import { Iconify } from 'src/components/iconify';
 import { usePopover, CustomPopover } from 'src/components/custom-popover';
@@ -33,12 +38,23 @@ type Props = {
 
 export function ChatHeaderDetail({ collapseNav, participants, loading }: Props) {
   const popover = usePopover();
+  const { startCall } = useCall();
+
+  const searchParams = useSearchParams();
+  const conversationId = searchParams.get('id') || '';
+  const { recordingUsers, typingUsers, onlineUsers } = useSocket();
 
   const lgUp = useResponsive('up', 'lg');
 
   const group = participants.length > 1;
 
   const singleParticipant = participants[0];
+  
+  const isRecording = (recordingUsers[conversationId] || []).includes(singleParticipant?.id);
+  const isTyping = (typingUsers[conversationId] || []).includes(singleParticipant?.id);
+  const isRealtimeOnline = onlineUsers.has(singleParticipant?.id);
+  
+  const statusToDisplay = isRealtimeOnline ? 'online' : singleParticipant?.status;
 
   const { collapseDesktop, onCollapseDesktop, onOpenMobile } = collapseNav;
 
@@ -51,6 +67,19 @@ export function ChatHeaderDetail({ collapseNav, participants, loading }: Props) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lgUp]);
 
+  // Collect participant IDs — matches `id` field on IChatParticipant
+  const participantIds = participants.map((p) => p.id);
+
+  const handleAudioCall = useCallback(() => {
+    if (!participantIds.length) return;
+    startCall(participantIds, 'audio');
+  }, [participantIds, startCall]);
+
+  const handleVideoCall = useCallback(() => {
+    if (!participantIds.length) return;
+    startCall(participantIds, 'video');
+  }, [participantIds, startCall]);
+
   const renderGroup = (
     <AvatarGroup max={3} sx={{ [`& .${avatarGroupClasses.avatar}`]: { width: 32, height: 32 } }}>
       {participants.map((participant) => (
@@ -62,7 +91,7 @@ export function ChatHeaderDetail({ collapseNav, participants, loading }: Props) 
   const renderSingle = (
     <Stack direction="row" alignItems="center" spacing={2}>
       <Badge
-        variant={singleParticipant?.status}
+        variant={statusToDisplay}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
       >
         <Avatar src={singleParticipant?.avatarUrl} alt={singleParticipant?.name} />
@@ -71,13 +100,19 @@ export function ChatHeaderDetail({ collapseNav, participants, loading }: Props) 
       <ListItemText
         primary={singleParticipant?.name}
         secondary={
-          singleParticipant?.status === 'offline'
-            ? fToNow(singleParticipant?.lastActivity)
-            : singleParticipant?.status
+          isRecording ? (
+            <span style={{ color: '#00a884', fontWeight: 600 }}>Recording audio... 🎙️</span>
+          ) : isTyping ? (
+            <span style={{ color: '#00a884', fontWeight: 600 }}>typing...</span>
+          ) : statusToDisplay === 'offline' ? (
+            fToNow(singleParticipant?.lastActivity)
+          ) : (
+            statusToDisplay
+          )
         }
         secondaryTypographyProps={{
           component: 'span',
-          ...(singleParticipant?.status !== 'offline' && { textTransform: 'capitalize' }),
+          ...(statusToDisplay !== 'offline' && !isRecording && !isTyping && { textTransform: 'capitalize' }),
         }}
       />
     </Stack>
@@ -92,11 +127,11 @@ export function ChatHeaderDetail({ collapseNav, participants, loading }: Props) 
       {group ? renderGroup : renderSingle}
 
       <Stack direction="row" flexGrow={1} justifyContent="flex-end">
-        <IconButton>
+        <IconButton onClick={handleAudioCall} title="Start audio call">
           <Iconify icon="solar:phone-bold" />
         </IconButton>
 
-        <IconButton>
+        <IconButton onClick={handleVideoCall} title="Start video call">
           <Iconify icon="solar:videocamera-record-bold" />
         </IconButton>
 

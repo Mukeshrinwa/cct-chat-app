@@ -118,6 +118,12 @@ export const endpoints = {
     search: '/api/v1/users/search',
     getAll: '/api/v1/users/get',
   },
+  calls: {
+    webhook: '/api/v1/calls/webhook',
+    history: '/api/v1/calls/history',
+    initiate: '/api/v1/calls/initiate',
+    end: '/api/v1/calls/end',
+  },
   mail: {
     list: '/api/mail/list',
     details: '/api/mail/details',

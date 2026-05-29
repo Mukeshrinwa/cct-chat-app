@@ -86,6 +86,46 @@ class SocketService {
       resolve(true);
     });
   }
+
+  // --- Realtime Actions & Presence Methods ---
+
+  startRecording(payload: { conversationId: string; recipientId: string }) {
+    this.emit('recording_start', payload);
+  }
+
+  stopRecording(payload: { conversationId: string; recipientId: string }) {
+    this.emit('recording_stop', payload);
+  }
+
+  listenRecordingStatus(callback: (payload: { conversationId: string; userId: string; recording: boolean }) => void) {
+    if (!this.socket) return () => {};
+    this.socket.on('user_recording', callback);
+    return () => this.socket?.off('user_recording', callback);
+  }
+
+  listenBlockedUser(callback: (payload: { targetUserId: string }) => void) {
+    if (!this.socket) return () => {};
+    this.socket.on('user_blocked', callback);
+    return () => this.socket?.off('user_blocked', callback);
+  }
+
+  listenUnblockedUser(callback: (payload: { targetUserId: string }) => void) {
+    if (!this.socket) return () => {};
+    this.socket.on('user_unblocked', callback);
+    return () => this.socket?.off('user_unblocked', callback);
+  }
+
+  listenPresenceHidden(callback: (payload: { userId: string; status: string }) => void) {
+    if (!this.socket) return () => {};
+    this.socket.on('presence_hidden', callback);
+    return () => this.socket?.off('presence_hidden', callback);
+  }
+
+  listenPresenceRestored(callback: (payload: { userId: string; status: string }) => void) {
+    if (!this.socket) return () => {};
+    this.socket.on('presence_restored', callback);
+    return () => this.socket?.off('presence_restored', callback);
+  }
 }
 
 export const socketService = new SocketService();

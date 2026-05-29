@@ -23,6 +23,7 @@ export type IChatMessage = {
   deleteType?: 'everyone' | 'me';
   reactions?: Array<{ emoji: string; senderId: string; username?: string }>;
   editedAt?: IDateValue;
+  status?: 'sent' | 'delivered' | 'read';
 };
 
 export type IChatParticipant = {

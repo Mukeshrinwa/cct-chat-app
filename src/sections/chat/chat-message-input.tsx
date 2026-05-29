@@ -55,7 +55,7 @@ export function ChatMessageInput({
 }: Props) {
   const router = useRouter();
 
-  const { startTyping } = useSocket();
+  const { startTyping, startRecording, stopRecording } = useSocket();
 
   const lastTypingTimeRef = useRef<number>(0);
 
@@ -208,6 +208,79 @@ export function ChatMessageInput({
     [onSubmitMessage]
   );
 
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+
+  const handleStartRecording = useCallback(async () => {
+    if (!selectedConversationId) return;
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        // Stop all tracks to release mic
+        stream.getTracks().forEach((track) => track.stop());
+
+        // Convert to base64 to send
+        const reader = new FileReader();
+        reader.readAsDataURL(audioBlob);
+        reader.onloadend = async () => {
+          const base64Audio = reader.result as string;
+
+          const audioMessageData = {
+            id: uuidv4(),
+            attachments: [],
+            body: base64Audio,
+            contentType: 'audio',
+            createdAt: new Date().toISOString(),
+            senderId: myContact.id,
+          };
+
+          try {
+            await sendMessage(selectedConversationId, audioMessageData);
+          } catch (error) {
+            console.error('Failed to send audio message:', error);
+          }
+        };
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      startRecording({
+        conversationId: selectedConversationId,
+        recipientId: recipients[0]?.id || '',
+      });
+    } catch (error) {
+      console.error('Microphone access denied or error:', error);
+      alert('Please allow microphone permissions to record audio.');
+    }
+  }, [selectedConversationId, recipients, startRecording, myContact.id]);
+
+  const handleStopRecording = useCallback(() => {
+    if (!selectedConversationId || !isRecording) return;
+    setIsRecording(false);
+    
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+
+    stopRecording({
+      conversationId: selectedConversationId,
+      recipientId: recipients[0]?.id || '',
+    });
+  }, [selectedConversationId, recipients, stopRecording, isRecording]);
+
   const handleSendClick = useCallback(async () => {
     onSubmitMessage();
   }, [onSubmitMessage]);
@@ -220,25 +293,42 @@ export function ChatMessageInput({
         value={message}
         onKeyUp={handleSendMessage}
         onChange={handleChangeMessage}
-        placeholder="Type a message"
-        disabled={disabled}
+        placeholder={isRecording ? 'Recording audio...' : 'Type a message'}
+        disabled={disabled || isRecording}
         startAdornment={
-          <IconButton onClick={handleOpenEmoji}>
+          <IconButton onClick={handleOpenEmoji} disabled={isRecording}>
             <Iconify icon="eva:smiling-face-fill" />
           </IconButton>
         }
         endAdornment={
           <Stack direction="row" sx={{ flexShrink: 0 }}>
-            <IconButton onClick={handleAttach}>
+            <IconButton onClick={handleAttach} disabled={isRecording}>
               <Iconify icon="solar:gallery-add-bold" />
             </IconButton>
-            <IconButton onClick={handleAttach}>
+            <IconButton onClick={handleAttach} disabled={isRecording}>
               <Iconify icon="eva:attach-2-fill" />
             </IconButton>
-            <IconButton>
+            <IconButton
+              onMouseDown={handleStartRecording}
+              onMouseUp={handleStopRecording}
+              onMouseLeave={isRecording ? handleStopRecording : undefined}
+              onTouchStart={handleStartRecording}
+              onTouchEnd={handleStopRecording}
+              color={isRecording ? 'error' : 'default'}
+              sx={{
+                ...(isRecording && {
+                  animation: 'pulse 1.5s infinite',
+                  '@keyframes pulse': {
+                    '0%': { transform: 'scale(1)' },
+                    '50%': { transform: 'scale(1.2)' },
+                    '100%': { transform: 'scale(1)' },
+                  },
+                }),
+              }}
+            >
               <Iconify icon="solar:microphone-bold" />
             </IconButton>
-            <IconButton onClick={handleSendClick} disabled={!message.trim()}>
+            <IconButton onClick={handleSendClick} disabled={!message.trim() || isRecording}>
               <Iconify
                 icon="iconamoon:send-fill"
                 sx={{

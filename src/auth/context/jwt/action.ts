@@ -110,14 +110,8 @@ export const signInWithPassword = async ({ identifier, password }: SignInParams)
     const trimmed = identifier.trim();
     const isMobile = /^\+?\d{7,15}$/.test(trimmed);
 
-    // Auto-add +91 country code if user enters plain 10-digit number
-    let mobile = trimmed;
-    if (isMobile && !trimmed.startsWith('+')) {
-      mobile = `+91${trimmed}`;
-    }
-
     const params = isMobile
-      ? { mobile, password }
+      ? { mobile: trimmed, password }
       : { username: trimmed, password };
 
     const res = await axios.post(endpoints.auth.signIn, params);

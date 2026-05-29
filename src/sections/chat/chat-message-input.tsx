@@ -10,6 +10,7 @@ import IconButton from '@mui/material/IconButton';
 import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
 
+import axios from 'src/utils/axios';
 import { uuidv4 } from 'src/utils/uuidv4';
 import { fSub, today } from 'src/utils/format-time';
 
@@ -96,46 +97,27 @@ export function ChatMessageInput({
 
   const handleFileChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (!file || !selectedConversationId) return;
 
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const base64String = reader.result as string;
-      
-      const fileMessageData = {
-        id: uuidv4(),
-        attachments: [],
-        body: base64String,
-        contentType: 'image',
-        createdAt: fSub({ minutes: 1 }),
-        senderId: myContact.id,
-      };
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('conversationId', selectedConversationId);
+      formData.append('messageId', uuidv4());
 
-      try {
-        if (selectedConversationId) {
-          await sendMessage(selectedConversationId, fileMessageData);
-        } else {
-          const fileConversationData = {
-            id: uuidv4(),
-            messages: [fileMessageData],
-            participants: [...recipients, myContact],
-            type: recipients.length > 1 ? 'GROUP' : 'ONE_TO_ONE',
-            unreadCount: 0,
-          };
-          const res = await createConversation(fileConversationData);
-          router.push(`${paths.dashboard.chat}?id=${res.conversation.id}`);
-          onAddRecipients([]);
-        }
-      } catch (error) {
-        console.error('Failed to send file:', error);
-      }
-    };
-    reader.readAsDataURL(file);
+      await axios.post('/api/v1/files/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      console.log('[IMAGE_UPLOAD] File uploaded via FormData');
+    } catch (error) {
+      console.error('Failed to send file:', error);
+    }
 
     if (fileRef.current) {
       fileRef.current.value = '';
     }
-  }, [myContact, recipients, router, selectedConversationId, onAddRecipients]);
+  }, [selectedConversationId]);
+
 
 
 
@@ -232,27 +214,19 @@ export function ChatMessageInput({
         // Stop all tracks to release mic
         stream.getTracks().forEach((track) => track.stop());
 
-        // Convert to base64 to send
-        const reader = new FileReader();
-        reader.readAsDataURL(audioBlob);
-        reader.onloadend = async () => {
-          const base64Audio = reader.result as string;
+        // Upload directly as FormData — no base64 conversion needed
+        const audioFile = new File([audioBlob], `voice_${Date.now()}.webm`, { type: 'audio/webm' });
+        const formData = new FormData();
+        formData.append('file', audioFile);
+        formData.append('conversationId', selectedConversationId);
+        formData.append('messageId', uuidv4());
 
-          const audioMessageData = {
-            id: uuidv4(),
-            attachments: [],
-            body: base64Audio,
-            contentType: 'audio',
-            createdAt: new Date().toISOString(),
-            senderId: myContact.id,
-          };
-
-          try {
-            await sendMessage(selectedConversationId, audioMessageData);
-          } catch (error) {
-            console.error('Failed to send audio message:', error);
-          }
-        };
+        axios
+          .post('/api/v1/files/upload', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+          })
+          .then(() => console.log('[AUDIO_UPLOAD] Voice note uploaded successfully'))
+          .catch((err) => console.error('[AUDIO_UPLOAD] Failed to upload voice note:', err));
       };
 
       mediaRecorder.start();
@@ -265,7 +239,7 @@ export function ChatMessageInput({
       console.error('Microphone access denied or error:', error);
       alert('Please allow microphone permissions to record audio.');
     }
-  }, [selectedConversationId, recipients, startRecording, myContact.id]);
+  }, [selectedConversationId, recipients, startRecording]);
 
   const handleStopRecording = useCallback(() => {
     if (!selectedConversationId || !isRecording) return;

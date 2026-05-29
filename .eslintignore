@@ -1,0 +1,14 @@
+# Build output - ESLint lint nahi karega
+dist/
+dist-*/
+.vite/
+
+# Vite config - tsconfig mein nahi hai
+vite.config.ts
+vite.config.js
+
+# Node modules
+node_modules/
+
+# Reference project folder
+cct_chat_employ_user_admin/

@@ -7,6 +7,8 @@ import Box from '@mui/material/Box';
 import { paths } from 'src/routes/paths';
 import { useRouter, useSearchParams } from 'src/routes/hooks';
 
+import { useGroupSockets } from 'src/hooks/use-group-sockets';
+
 import { CONFIG } from 'src/config-global';
 import { useGetContacts, useGetConversation, useGetConversations } from 'src/actions/chat';
 
@@ -29,6 +31,9 @@ export function ChatView() {
   const router = useRouter();
 
   const { user } = useMockedUser();
+
+  // Group socket events sun-ta hai — group create/delete/call sab handle karta hai
+  useGroupSockets(user?.id);
 
   const { contacts } = useGetContacts();
 

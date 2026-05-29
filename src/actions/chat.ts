@@ -545,28 +545,68 @@ export async function sendMessage(conversationId: string, messageData: IChatMess
     mutate(`/api/v1/chats/conversations/${realConvId}`, updateConversationCache, { revalidate: false });
   }
 
-  // 2. Send message
+  // 2. Send message via socket or HTTP
   let socketSent = false;
-  try {
-    if (socketService.isConnected()) {
-      await socketService.emit('send_message', {
-        messageId: messageData.id,
+  const msgType = messageData.contentType || 'text';
+  const isFileMessage = msgType === 'image' || msgType === 'audio' || msgType === 'video' || msgType === 'document';
+
+  if (isFileMessage) {
+    // File messages — upload via FormData to /api/v1/files/upload
+    // body contains base64 string
+    try {
+      // Convert base64 to Blob
+      const base64Data = messageData.body as string;
+      const byteString = atob(base64Data.split(',')[1] || base64Data);
+      const mimeString = base64Data.split(',')[0]?.split(':')[1]?.split(';')[0] || (msgType === 'audio' ? 'audio/webm' : 'image/jpeg');
+      const ab = new ArrayBuffer(byteString.length);
+      const ia = new Uint8Array(ab);
+      for (let i = 0; i < byteString.length; i += 1) {
+        ia[i] = byteString.charCodeAt(i);
+      }
+      const blob = new Blob([ab], { type: mimeString });
+      const ext = mimeString.split('/')[1] || 'bin';
+      const fileName = `${msgType}_${Date.now()}.${ext}`;
+      const file = new File([blob], fileName, { type: mimeString });
+
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('conversationId', realConvId);
+      formData.append('messageId', messageData.id);
+
+      await axios.post('/api/v1/files/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      console.log(`[${msgType.toUpperCase()}_UPLOAD] File sent via FormData upload`);
+      socketSent = true; // backend will emit new_message via socket
+    } catch (uploadError) {
+      console.error(`[${msgType.toUpperCase()}_UPLOAD] Failed:`, uploadError);
+    }
+  } else {
+    // Text messages — send via socket
+    try {
+      if (socketService.isConnected()) {
+        await socketService.emit('send_message', {
+          messageId: messageData.id,
+          conversationId: realConvId,
+          text: messageData.body,
+          type: 'text',
+        });
+        socketSent = true;
+        console.log('Message sent via socket');
+      }
+    } catch (socketError) {
+      console.error('Socket sendMessage failed, falling back to HTTP API:', socketError);
+    }
+
+    // HTTP fallback for text
+    if (!socketSent) {
+      await axios.post('/api/v1/chats/message', {
         conversationId: realConvId,
         text: messageData.body,
+        type: 'text',
       });
-      socketSent = true;
-      console.log('Message sent via socket');
+      console.log('Text message sent via HTTP API fallback');
     }
-  } catch (socketError) {
-    console.error('Socket sendMessage failed, falling back to HTTP API:', socketError);
-  }
-
-  if (!socketSent) {
-    await axios.post('/api/v1/chats/message', {
-      conversationId: realConvId,
-      text: messageData.body,
-    });
-    console.log('Message sent via HTTP API fallback');
   }
 
   // 3. Mutate caches in background after a delay
@@ -578,6 +618,7 @@ export async function sendMessage(conversationId: string, messageData: IChatMess
     }
   }, 1000);
 }
+
 
 // ----------------------------------------------------------------------
 

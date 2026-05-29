@@ -8,6 +8,20 @@ import { CONFIG } from 'src/config-global';
 
 const axiosInstance = axios.create({ baseURL: CONFIG.site.serverUrl });
 
+// Attach Authorization token on every request (sessionStorage -> localStorage fallback)
+axiosInstance.interceptors.request.use(
+  (config) => {
+    const token =
+      sessionStorage.getItem('jwt_access_token') || localStorage.getItem('token');
+    if (token) {
+      // eslint-disable-next-line no-param-reassign
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
 let isRefreshing = false;
 let failedQueue: any[] = [];
 
@@ -27,7 +41,9 @@ axiosInstance.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    if (error.response && error.response.status === 401 && !originalRequest._retry) {
+    const isAuthRequest = originalRequest.url && (originalRequest.url.includes('/auth/login') || originalRequest.url.includes('/auth/register'));
+
+    if (error.response && error.response.status === 401 && !originalRequest._retry && !isAuthRequest) {
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           failedQueue.push({ resolve, reject });
@@ -123,6 +139,13 @@ export const endpoints = {
     history: '/api/v1/calls/history',
     initiate: '/api/v1/calls/initiate',
     end: '/api/v1/calls/end',
+  },
+  groups: {
+    list: '/api/v1/groups',
+    details: (groupId: string) => `/api/v1/groups/${groupId}`,
+    addMember: (groupId: string) => `/api/v1/groups/${groupId}/add-member`,
+    removeMember: (groupId: string) => `/api/v1/groups/${groupId}/remove-member`,
+    leave: (groupId: string) => `/api/v1/groups/${groupId}/leave`,
   },
   mail: {
     list: '/api/mail/list',

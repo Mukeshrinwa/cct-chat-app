@@ -736,15 +736,58 @@ export async function editMessage(messageId: string, text: string, attachments: 
 // ----------------------------------------------------------------------
 
 export async function reactToMessage(messageId: string, emoji: string, conversationId?: string) {
+  // --- Optimistic update for the sender (instant UI feedback) ---
+  if (conversationId) {
+    mutate(
+      `/api/v1/chats/conversations/${conversationId}`,
+      (current: any) => {
+        if (!current?.conversation?.messages) return current;
+        return {
+          ...current,
+          conversation: {
+            ...current.conversation,
+            messages: current.conversation.messages.map((m: any) => {
+              if (m.id !== messageId) return m;
+
+              const currentUserId =
+                (window as any).__chatCurrentUserId ||
+                sessionStorage.getItem('currentUserId') ||
+                '';
+
+              const existing: Array<{ emoji: string; senderId: string }> = m.reactions || [];
+              const alreadyReacted = existing.find(
+                (r) => r.senderId === currentUserId && r.emoji === emoji
+              );
+
+              // Toggle: remove if same emoji already exists, else add/replace sender's reaction
+              const updated = alreadyReacted
+                ? existing.filter((r) => !(r.senderId === currentUserId && r.emoji === emoji))
+                : [
+                    ...existing.filter((r) => r.senderId !== currentUserId),
+                    { emoji, senderId: currentUserId },
+                  ];
+
+              return { ...m, reactions: updated };
+            }),
+          },
+        };
+      },
+      { revalidate: false }
+    );
+  }
+
   try {
-    await axios.post(`/api/v1/chats/message/${messageId}/react`, {
-      emoji,
-    });
+    await axios.post(`/api/v1/chats/message/${messageId}/react`, { emoji });
+    // Revalidate after success to get server-normalized data
     if (conversationId) {
       mutate(`/api/v1/chats/conversations/${conversationId}`);
     }
     mutate('/api/v1/chats/conversations');
   } catch (error) {
+    // Roll back optimistic update on failure
+    if (conversationId) {
+      mutate(`/api/v1/chats/conversations/${conversationId}`);
+    }
     console.error('Failed to react to message:', error);
     throw error;
   }

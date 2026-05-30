@@ -53,7 +53,28 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
   const { body, createdAt } = message;
 
   const imageUrl = message.attachments?.[0]?.preview || getMediaUrl(body);
-  const audioUrl = message.attachments?.[0]?.preview || getMediaUrl(body);
+  
+  const isAudio =
+    message.contentType === 'audio' ||
+    (message as any).type === 'audio' ||
+    (typeof body === 'string' && (body.startsWith('data:audio/') || /\.(mp3|wav|ogg|aac|webm)($|\?)/i.test(body))) ||
+    message.attachments?.some(
+      (att: any) =>
+        att.type?.startsWith('audio/') ||
+        /\.(mp3|wav|ogg|aac|webm)($|\?)/i.test(att.name || '') ||
+        /\.(mp3|wav|ogg|aac|webm)($|\?)/i.test(att.preview || '')
+    );
+
+  const audioUrl = (() => {
+    const attUrl = message.attachments?.find(
+      (att: any) =>
+        att.type?.startsWith('audio/') ||
+        /\.(mp3|wav|ogg|aac|webm)($|\?)/i.test(att.name || '') ||
+        /\.(mp3|wav|ogg|aac|webm)($|\?)/i.test(att.preview || '')
+    )?.preview;
+    if (attUrl) return attUrl;
+    return getMediaUrl(body);
+  })();
 
   // Edit State
   const [isEditing, setIsEditing] = useState(false);
@@ -248,7 +269,7 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
             '&:hover': { opacity: 0.9 },
           }}
         />
-      ) : message.contentType === 'audio' || (message as any).type === 'audio' || (typeof body === 'string' && body.startsWith('data:audio/')) ? (
+      ) : isAudio ? (
         <Box sx={{ width: 280, pt: 1 }}>
           {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
           <audio controls src={audioUrl} style={{ width: '100%', height: 40, outline: 'none' }} />
@@ -264,14 +285,16 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
       direction="row"
       className="message-actions"
       sx={{
-        pt: 0.5,
-        left: 0,
+        top: '50%',
         opacity: 0,
-        top: '100%',
         position: 'absolute',
+        transform: 'translateY(-50%)',
         transition: (theme) =>
           theme.transitions.create(['opacity'], { duration: theme.transitions.duration.shorter }),
-        ...(me && { right: 0, left: 'unset' }),
+        // Receiver: actions appear to the RIGHT of the bubble
+        right: me ? 'unset' : -112,
+        // Sender: actions appear to the LEFT of the bubble
+        left: me ? -112 : 'unset',
       }}
     >
       <IconButton size="small" onClick={() => setForwardDialogOpen(true)}>
@@ -418,7 +441,7 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
   );
 
   return (
-    <Stack direction="row" justifyContent={me ? 'flex-end' : 'unset'} sx={{ mb: 5 }}>
+    <Stack direction="row" justifyContent={me ? 'flex-end' : 'unset'} sx={{ mb: 3 }}>
       {!me && <Avatar alt={firstName} src={avatarUrl} sx={{ width: 32, height: 32, mr: 2 }} />}
 
       <Stack alignItems={me ? 'flex-end' : 'flex-start'}>
@@ -427,7 +450,11 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
         <Stack
           direction="row"
           alignItems="center"
-          sx={{ position: 'relative', '&:hover': { '& .message-actions': { opacity: 1 } } }}
+          sx={{
+            position: 'relative',
+            overflow: 'visible',
+            '&:hover': { '& .message-actions': { opacity: 1 } },
+          }}
         >
           {renderBody}
           {renderActions}

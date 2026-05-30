@@ -71,6 +71,13 @@ export function SocketProvider({ children }: SocketProviderProps) {
 
   const activeConversationId = useChatStore((state) => state.activeConversationId);
 
+  // Expose currentUserId to non-React code (e.g. optimistic reaction updater)
+  useEffect(() => {
+    if (currentUserId) {
+      (window as any).__chatCurrentUserId = currentUserId;
+    }
+  }, [currentUserId]);
+
   // Sync auth store with current JWT context so other stores can access token
   useEffect(() => {
     if (user && token) {
@@ -106,6 +113,12 @@ export function SocketProvider({ children }: SocketProviderProps) {
       setIsConnected(true);
       console.log(`[SOCKET_CONNECTED] Socket ID: ${socketInstance.id} | TS: ${Date.now()}`);
     };
+
+    // 🔍 DEBUG: log ALL incoming socket events to find exact event names
+    const onAnyEvent = (eventName: string, ...args: any[]) => {
+      console.log(`[SOCKET_EVENT] "${eventName}"`, JSON.stringify(args).slice(0, 300));
+    };
+    socketInstance.onAny(onAnyEvent);
 
     const onDisconnect = (reason: string) => {
       setIsConnected(false);
@@ -475,15 +488,57 @@ export function SocketProvider({ children }: SocketProviderProps) {
     // -----------------------------------------------------------------------
     // 11. UPLOAD COMPLETED
     // -----------------------------------------------------------------------
-    socketInstance.on('upload_completed', (_payload: { uploadId: string; message: any }) => {
+    socketInstance.on('upload_completed', (payload: { uploadId: string; message: any }) => {
       mutate('/api/v1/chats/conversations');
+      const convId = payload?.message?.conversationId || useChatStore.getState().activeConversationId;
+      if (convId) {
+        mutate(`/api/v1/chats/conversations/${convId}`);
+      }
     });
+
+    // -----------------------------------------------------------------------
+    // 12. REACTIONS - message_reaction (real-time for all participants)
+    // -----------------------------------------------------------------------
+    socketInstance.on(
+      'message_reaction',
+      (payload: {
+        messageId: string;
+        conversationId: string;
+        reactions: Array<{ emoji: string; senderId: string; username?: string }>;
+        emoji?: string;
+        senderId?: string;
+      }) => {
+        const convId = payload.conversationId;
+        if (!convId) return;
+
+        // Patch reactions in SWR cache without a network refetch
+        mutate(
+          `/api/v1/chats/conversations/${convId}`,
+          (current: any) => {
+            if (!current?.conversation?.messages) return current;
+            return {
+              ...current,
+              conversation: {
+                ...current.conversation,
+                messages: current.conversation.messages.map((m: any) =>
+                  m.id === payload.messageId
+                    ? { ...m, reactions: payload.reactions }
+                    : m
+                ),
+              },
+            };
+          },
+          { revalidate: false }
+        );
+      }
+    );
 
     // NOTE: call_* events (incoming_call, call_accepted, etc.)
     // are intentionally NOT handled here — they are managed in CallContext.
 
     // Cleanup
     return () => {
+      socketInstance.offAny(onAnyEvent);
       socketInstance.off('connect', onConnect);
       socketInstance.off('disconnect', onDisconnect);
       socketInstance.off('online_users');
@@ -499,6 +554,7 @@ export function SocketProvider({ children }: SocketProviderProps) {
       socketInstance.off('user_unblocked');
       socketInstance.off('disappearing_mode_update');
       socketInstance.off('upload_completed');
+      socketInstance.off('message_reaction');
       Object.values(typingTimeouts).forEach(clearTimeout);
     };
   }, [token, currentUserId]);

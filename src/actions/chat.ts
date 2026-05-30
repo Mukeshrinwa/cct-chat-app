@@ -586,14 +586,14 @@ export async function sendMessage(conversationId: string, messageData: IChatMess
       console.error(`[${msgType.toUpperCase()}_UPLOAD] Failed:`, uploadError);
     }
   } else {
-    // Text messages — send via socket
+    // Text or gif messages — send via socket
     try {
       if (socketService.isConnected()) {
         await socketService.emit('send_message', {
           messageId: messageData.id,
           conversationId: realConvId,
           text: messageData.body,
-          type: 'text',
+          type: msgType === 'gif' ? 'gif' : 'text',
         });
         socketSent = true;
         console.log('Message sent via socket');
@@ -602,14 +602,14 @@ export async function sendMessage(conversationId: string, messageData: IChatMess
       console.error('Socket sendMessage failed, falling back to HTTP API:', socketError);
     }
 
-    // HTTP fallback for text
+    // HTTP fallback
     if (!socketSent) {
       await axios.post('/api/v1/chats/message', {
         conversationId: realConvId,
         text: messageData.body,
-        type: 'text',
+        type: msgType === 'gif' ? 'gif' : 'text',
       });
-      console.log('Text message sent via HTTP API fallback');
+      console.log('Message sent via HTTP API fallback');
     }
   }
 

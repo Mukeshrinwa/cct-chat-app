@@ -44,6 +44,8 @@ const EMOJIS = [
   '👆', '👇', '👍', '👎', '👊', '👏', '🙌', '🙏', '❤️', '💔'
 ];
 
+const GIPHY_API_KEY = 'SB758rkq1nNFUmjlVkwo6jAbtTkWfP0M';
+
 const POPULAR_GIFS = [
   { id: '1', title: 'Thumbs Up', url: 'https://media.giphy.com/media/tIeCLkB8geYtW/giphy.gif' },
   { id: '2', title: 'Clapping', url: 'https://media.giphy.com/media/3o7qE1YN7aBOFPRw8E/giphy.gif' },
@@ -120,7 +122,7 @@ export function ChatMessageInput({
 
   const handleOpenGif = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
     setGifAnchor(event.currentTarget);
-    const apiKey = giphyApiKey || import.meta.env.VITE_GIPHY_API_KEY || '';
+    const apiKey = giphyApiKey || import.meta.env.VITE_GIPHY_API_KEY || GIPHY_API_KEY;
     if (apiKey && gifResults.length === 0) {
       setGifLoading(true);
       fetch(`https://api.giphy.com/v1/gifs/trending?api_key=${apiKey}&limit=16`)
@@ -148,7 +150,7 @@ export function ChatMessageInput({
   const handleGifSearchChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const { value } = event.target;
     setGifSearch(value);
-    const apiKey = giphyApiKey || import.meta.env.VITE_GIPHY_API_KEY || '';
+    const apiKey = giphyApiKey || import.meta.env.VITE_GIPHY_API_KEY || GIPHY_API_KEY;
     if (!apiKey) return;
 
     if (!value.trim()) {
@@ -637,7 +639,7 @@ export function ChatMessageInput({
               overflowY: 'auto',
             }}
           >
-            {((gifSearch.trim() && (giphyApiKey || import.meta.env.VITE_GIPHY_API_KEY)) ? gifResults : POPULAR_GIFS).map((gif) => (
+            {((gifSearch.trim() && (giphyApiKey || import.meta.env.VITE_GIPHY_API_KEY || GIPHY_API_KEY)) ? gifResults : POPULAR_GIFS).map((gif) => (
               <Box
                 key={gif.id}
                 component="img"
@@ -660,7 +662,7 @@ export function ChatMessageInput({
           </Box>
         )}
 
-        {!(giphyApiKey || import.meta.env.VITE_GIPHY_API_KEY) && (
+        {!(giphyApiKey || import.meta.env.VITE_GIPHY_API_KEY || GIPHY_API_KEY) && (
           <Stack spacing={1}>
             <Typography
               variant="caption"

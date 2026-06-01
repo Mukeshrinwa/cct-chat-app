@@ -1,6 +1,6 @@
 import type { IChatParticipant, IChatConversations } from 'src/types/chat';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
@@ -71,6 +71,23 @@ export function ChatNav({
   } = collapseNav;
 
   const [groupCreateOpen, setGroupCreateOpen] = useState(false);
+
+  // Unique participants from all existing conversations (excluding self)
+  const chatContacts = useMemo(() => {
+    const seen = new Set<string>();
+    const result: IChatParticipant[] = [];
+    conversations.allIds.forEach((convId) => {
+      const conv = conversations.byId[convId];
+      if (!conv) return;
+      conv.participants.forEach((p) => {
+        if (p.id === user?.id) return;
+        if (seen.has(p.id)) return;
+        seen.add(p.id);
+        result.push(p);
+      });
+    });
+    return result;
+  }, [conversations, user]);
 
   const [searchContacts, setSearchContacts] = useState<{
     query: string;
@@ -282,6 +299,7 @@ export function ChatNav({
         <ChatGroupCreateDialog
           open={groupCreateOpen}
           onClose={() => setGroupCreateOpen(false)}
+          chatContacts={chatContacts}
         />
       )}
     </>

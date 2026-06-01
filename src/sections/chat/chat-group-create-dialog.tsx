@@ -1,3 +1,5 @@
+import type { IChatParticipant } from 'src/types/chat';
+
 import { useRef, useState, useEffect, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
@@ -23,7 +25,6 @@ import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
 
 import { createGroup } from 'src/actions/group';
-import { getAllUsers, type UserData } from 'src/api/user';
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
@@ -33,9 +34,10 @@ import { Iconify } from 'src/components/iconify';
 type Props = {
   open: boolean;
   onClose: () => void;
+  chatContacts: IChatParticipant[];
 };
 
-export function ChatGroupCreateDialog({ open, onClose }: Props) {
+export function ChatGroupCreateDialog({ open, onClose, chatContacts }: Props) {
   const router = useRouter();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -44,9 +46,6 @@ export function ChatGroupCreateDialog({ open, onClose }: Props) {
   const [avatarPreview, setAvatarPreview] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  
-  const [users, setUsers] = useState<UserData[]>([]);
-  const [loadingUsers, setLoadingUsers] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const handleAvatarFileChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
@@ -80,23 +79,6 @@ export function ChatGroupCreateDialog({ open, onClose }: Props) {
     }
   };
 
-  useEffect(() => {
-    async function fetchUsers() {
-      if (!open) return;
-      try {
-        setLoadingUsers(true);
-        const fetched = await getAllUsers();
-        setUsers(fetched);
-      } catch (error) {
-        console.error('Failed to load users:', error);
-        toast.error('Failed to load contacts');
-      } finally {
-        setLoadingUsers(false);
-      }
-    }
-    fetchUsers();
-  }, [open]);
-
   // Reset fields on close
   useEffect(() => {
     if (!open) {
@@ -111,9 +93,11 @@ export function ChatGroupCreateDialog({ open, onClose }: Props) {
     }
   }, [open]);
 
-  const filteredUsers = users.filter((user) =>
-    user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    user.username.toLowerCase().includes(searchQuery.toLowerCase())
+  // Filter from chatContacts (users we've already talked to)
+  const filteredUsers = chatContacts.filter(
+    (c) =>
+      c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (c.username || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const handleSelect = (id: string) => {
@@ -137,7 +121,7 @@ export function ChatGroupCreateDialog({ open, onClose }: Props) {
       const res = await createGroup({
         name: groupName.trim(),
         participants: selectedIds,
-        avatar: groupAvatar.trim() || undefined,
+        avatar: groupAvatar || undefined,
       });
 
       toast.success('Group created successfully');
@@ -266,25 +250,19 @@ export function ChatGroupCreateDialog({ open, onClose }: Props) {
         </Stack>
 
         <List sx={{ px: 2, maxHeight: 240, overflow: 'auto', minHeight: 120 }}>
-          {loadingUsers ? (
+          {filteredUsers.length === 0 ? (
             <Stack sx={{ py: 4 }} alignItems="center" justifyContent="center">
               <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                Loading contacts...
-              </Typography>
-            </Stack>
-          ) : filteredUsers.length === 0 ? (
-            <Stack sx={{ py: 4 }} alignItems="center" justifyContent="center">
-              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                No contacts found
+                {chatContacts.length === 0 ? 'Abhi tak kisi se chat nahi ki' : 'No contacts found'}
               </Typography>
             </Stack>
           ) : (
-            filteredUsers.map((userItem) => {
-              const selected = selectedIds.includes(userItem._id);
+            filteredUsers.map((contact) => {
+              const selected = selectedIds.includes(contact.id);
               return (
                 <ListItemButton
-                  key={userItem._id}
-                  onClick={() => handleSelect(userItem._id)}
+                  key={contact.id}
+                  onClick={() => handleSelect(contact.id)}
                   sx={{
                     borderRadius: 1,
                     mb: 0.5,
@@ -292,10 +270,10 @@ export function ChatGroupCreateDialog({ open, onClose }: Props) {
                     py: 0.8,
                   }}
                 >
-                  <Avatar alt={userItem.name} src={userItem.avatar} sx={{ width: 36, height: 36 }} />
+                  <Avatar alt={contact.name} src={contact.avatarUrl} sx={{ width: 36, height: 36 }} />
                   <ListItemText
-                    primary={userItem.name}
-                    secondary={`@${userItem.username}`}
+                    primary={contact.name}
+                    secondary={`@${contact.username || contact.name}`}
                     primaryTypographyProps={{ variant: 'subtitle2', noWrap: true }}
                     secondaryTypographyProps={{ variant: 'caption', noWrap: true }}
                     sx={{ ml: 2 }}

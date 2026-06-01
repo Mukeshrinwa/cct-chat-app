@@ -134,10 +134,9 @@ export function JwtSignUpView() {
       setSuccessMsg('OTP sent successfully!');
       startResendTimer();
       setActiveStep(1);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      const msg = error?.message || error?.msg || 'Failed to send OTP';
-      setErrorMsg(typeof msg === 'string' ? msg : 'Failed to send OTP');
+      setErrorMsg(error.message || 'Failed to send OTP');
     }
   });
 
@@ -205,10 +204,9 @@ export function JwtSignUpView() {
 
       await checkUserSession?.();
       router.refresh();
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      const msg = error?.message || error?.msg || 'Registration failed';
-      setErrorMsg(typeof msg === 'string' ? msg : 'Registration failed');
+      setErrorMsg(error.message || 'Registration failed');
     }
   });
 

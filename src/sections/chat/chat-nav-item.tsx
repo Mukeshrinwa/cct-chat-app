@@ -45,7 +45,9 @@ export function ChatNavItem({ selected, collapse, conversation, onCloseMobile }:
 
   const singleParticipant = participants[0];
 
-  const { name, avatarUrl, status } = singleParticipant;
+  const name = singleParticipant?.name ?? '';
+  const avatarUrl = singleParticipant?.avatarUrl ?? '';
+  const status = singleParticipant?.status ?? 'invisible';
 
   const handleClickConversation = useCallback(async () => {
     try {

@@ -139,3 +139,54 @@ export async function deleteGroup(groupId: string) {
     throw error;
   }
 }
+
+// ----------------------------------------------------------------------
+
+export async function addMembersToGroup(groupId: string, members: string[]) {
+  try {
+    const res = await axios.post(`/api/v1/groups/${groupId}/add-member`, { members });
+
+    mutate('/api/v1/groups/list');
+    mutate(`/api/v1/groups/${groupId}`);
+    mutate('/api/v1/chats/conversations');
+
+    return res.data;
+  } catch (error) {
+    console.error('Failed to add group members:', error);
+    throw error;
+  }
+}
+
+// ----------------------------------------------------------------------
+
+export async function removeMemberFromGroup(groupId: string, memberId: string) {
+  try {
+    const res = await axios.post(`/api/v1/groups/${groupId}/remove-member`, { memberId });
+
+    mutate('/api/v1/groups/list');
+    mutate(`/api/v1/groups/${groupId}`);
+    mutate('/api/v1/chats/conversations');
+
+    return res.data;
+  } catch (error) {
+    console.error('Failed to remove group member:', error);
+    throw error;
+  }
+}
+
+// ----------------------------------------------------------------------
+
+export async function leaveGroupById(groupId: string) {
+  try {
+    const res = await axios.post(`/api/v1/groups/${groupId}/leave`, {});
+
+    mutate('/api/v1/groups/list');
+    mutate(`/api/v1/groups/${groupId}`);
+    mutate('/api/v1/chats/conversations');
+
+    return res.data;
+  } catch (error) {
+    console.error('Failed to leave group:', error);
+    throw error;
+  }
+}

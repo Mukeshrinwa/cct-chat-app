@@ -69,9 +69,9 @@ export function JwtSignInView() {
       await checkUserSession?.();
 
       router.refresh();
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      setErrorMsg(error instanceof Error ? error.message : error);
+      setErrorMsg(error.message || 'Something went wrong');
     }
   });
 

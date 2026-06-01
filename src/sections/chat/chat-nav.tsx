@@ -1,6 +1,6 @@
 import type { IChatParticipant, IChatConversations } from 'src/types/chat';
 
-import { useRef, useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
@@ -9,7 +9,6 @@ import { useTheme } from '@mui/material/styles';
 import TextField from '@mui/material/TextField';
 import IconButton from '@mui/material/IconButton';
 import InputAdornment from '@mui/material/InputAdornment';
-import CircularProgress from '@mui/material/CircularProgress';
 import ClickAwayListener from '@mui/material/ClickAwayListener';
 
 import { paths } from 'src/routes/paths';
@@ -17,10 +16,10 @@ import { useRouter } from 'src/routes/hooks';
 
 import { useResponsive } from 'src/hooks/use-responsive';
 
-import { searchUsers, type UserData } from 'src/api/user';
-
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
+
+import { useMockedUser } from 'src/auth/hooks';
 
 import { ToggleButton } from './styles';
 import { ChatNavItem } from './chat-nav-item';
@@ -45,24 +44,6 @@ type Props = {
   conversations: IChatConversations;
 };
 
-/**
- * Map API user result to IChatParticipant format used by the UI
- */
-function mapUserToParticipant(user: UserData): IChatParticipant {
-  return {
-    id: user._id,
-    name: user.name,
-    username: user.username,
-    role: user.role || 'user',
-    email: '',
-    address: '',
-    avatarUrl: user.avatar || '',
-    phoneNumber: '',
-    lastActivity: user.lastSeen || new Date().toISOString(),
-    status: user.isOnline ? 'online' : 'offline',
-  };
-}
-
 export function ChatNav({
   loading,
   contacts,
@@ -73,6 +54,8 @@ export function ChatNav({
   const theme = useTheme();
 
   const router = useRouter();
+
+  const { user } = useMockedUser();
 
   const mdUp = useResponsive('up', 'md');
 
@@ -91,11 +74,6 @@ export function ChatNav({
     query: string;
     results: IChatParticipant[];
   }>({ query: '', results: [] });
-
-  const [searching, setSearching] = useState(false);
-
-  // Debounce timer ref
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (!mdUp) {
@@ -118,35 +96,39 @@ export function ChatNav({
     router.push(paths.dashboard.chat);
   }, [mdUp, onCloseMobile, router]);
 
+  // Local username search: filter only users who are already in our conversations/chats
   const handleSearchContacts = useCallback((inputValue: string) => {
     setSearchContacts((prevState) => ({ ...prevState, query: inputValue }));
 
-    // Clear previous debounce timer
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current);
-    }
-
     if (!inputValue) {
       setSearchContacts({ query: '', results: [] });
-      setSearching(false);
       return;
     }
 
-    // Debounce: wait 400ms after user stops typing to call API
-    setSearching(true);
-    debounceRef.current = setTimeout(async () => {
-      try {
-        const users = await searchUsers(inputValue);
-        const mapped = users.map(mapUserToParticipant);
-        setSearchContacts((prevState) => ({ ...prevState, results: mapped }));
-      } catch (error) {
-        console.error('Search failed:', error);
-        setSearchContacts((prevState) => ({ ...prevState, results: [] }));
-      } finally {
-        setSearching(false);
+    const queryLower = inputValue.toLowerCase();
+    const results: IChatParticipant[] = [];
+    const seenIds = new Set<string>();
+
+    conversations.allIds.forEach((convId) => {
+      const conv = conversations.byId[convId];
+      if (conv && conv.participants) {
+        conv.participants.forEach((p) => {
+          if (p.id === user?.id) return; // exclude current user
+          if (seenIds.has(p.id)) return;
+
+          const nameMatch = p.name?.toLowerCase().includes(queryLower);
+          const usernameMatch = p.username?.toLowerCase().includes(queryLower);
+
+          if (nameMatch || usernameMatch) {
+            seenIds.add(p.id);
+            results.push(p);
+          }
+        });
       }
-    }, 400);
-  }, []);
+    });
+
+    setSearchContacts((prevState) => ({ ...prevState, results }));
+  }, [conversations, user]);
 
   const handleClickAwaySearch = useCallback(() => {
     setSearchContacts({ query: '', results: [] });
@@ -200,11 +182,6 @@ export function ChatNav({
               <Iconify icon="eva:search-fill" sx={{ color: 'text.disabled' }} />
             </InputAdornment>
           ),
-          endAdornment: searching ? (
-            <InputAdornment position="end">
-              <CircularProgress size={20} />
-            </InputAdornment>
-          ) : null,
         }}
         sx={{ mt: 2.5 }}
       />

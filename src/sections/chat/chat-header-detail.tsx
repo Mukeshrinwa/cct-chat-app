@@ -8,13 +8,13 @@ import Avatar from '@mui/material/Avatar';
 import Divider from '@mui/material/Divider';
 import MenuList from '@mui/material/MenuList';
 import MenuItem from '@mui/material/MenuItem';
+import TextField from '@mui/material/TextField';
 import IconButton from '@mui/material/IconButton';
 import ListItemText from '@mui/material/ListItemText';
+import InputAdornment from '@mui/material/InputAdornment';
 import AvatarGroup, { avatarGroupClasses } from '@mui/material/AvatarGroup';
 
 import { useSearchParams } from 'src/routes/hooks';
-
-import { useResponsive } from 'src/hooks/use-responsive';
 
 import { fToNow } from 'src/utils/format-time';
 
@@ -26,18 +26,23 @@ import { usePopover, CustomPopover } from 'src/components/custom-popover';
 
 import { ChatHeaderSkeleton } from './chat-skeleton';
 
-import type { UseNavCollapseReturn } from './hooks/use-collapse-nav';
-
 // ----------------------------------------------------------------------
 
 type Props = {
   loading: boolean;
   participants: IChatParticipant[];
-  collapseNav: UseNavCollapseReturn;
   isUserMember?: boolean;
+  searchQuery: string;
+  onSearchQueryChange: (query: string) => void;
 };
 
-export function ChatHeaderDetail({ collapseNav, participants, loading, isUserMember = true }: Props) {
+export function ChatHeaderDetail({
+  participants,
+  loading,
+  isUserMember = true,
+  searchQuery,
+  onSearchQueryChange,
+}: Props) {
   const popover = usePopover();
   const { startCall } = useCall();
 
@@ -45,7 +50,6 @@ export function ChatHeaderDetail({ collapseNav, participants, loading, isUserMem
   const conversationId = searchParams.get('id') || '';
   const { recordingUsers, typingUsers, onlineUsers } = useSocket();
 
-  const lgUp = useResponsive('up', 'lg');
 
   const group = participants.length > 1;
 
@@ -57,16 +61,7 @@ export function ChatHeaderDetail({ collapseNav, participants, loading, isUserMem
   
   const statusToDisplay = isRealtimeOnline ? 'online' : singleParticipant?.status;
 
-  const { collapseDesktop, onCollapseDesktop, onOpenMobile } = collapseNav;
 
-  const handleToggleNav = useCallback(() => {
-    if (lgUp) {
-      onCollapseDesktop();
-    } else {
-      onOpenMobile();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lgUp]);
 
   // Collect participant IDs — matches `id` field on IChatParticipant
   const participantIds = participants.map((p) => p.id);
@@ -127,17 +122,43 @@ export function ChatHeaderDetail({ collapseNav, participants, loading, isUserMem
     <>
       {group ? renderGroup : renderSingle}
 
-      <Stack direction="row" flexGrow={1} justifyContent="flex-end">
+      <Stack direction="row" flexGrow={1} justifyContent="flex-end" alignItems="center">
+        <TextField
+          size="small"
+          value={searchQuery}
+          onChange={(e) => onSearchQueryChange(e.target.value)}
+          placeholder="Search chats..."
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <Iconify icon="eva:search-fill" sx={{ color: 'text.disabled', width: 18, height: 18 }} />
+              </InputAdornment>
+            ),
+            endAdornment: searchQuery ? (
+              <InputAdornment position="end">
+                <IconButton size="small" onClick={() => onSearchQueryChange('')}>
+                  <Iconify icon="eva:close-fill" sx={{ width: 18, height: 18 }} />
+                </IconButton>
+              </InputAdornment>
+            ) : null,
+          }}
+          sx={{
+            mr: 2,
+            width: { xs: 120, sm: 180, md: 220 },
+            '& .MuiOutlinedInput-root': {
+              borderRadius: 1.5,
+              bgcolor: 'background.neutral',
+              '& fieldset': { border: 'none' },
+            },
+          }}
+        />
+
         <IconButton onClick={handleAudioCall} disabled={!isUserMember} title="Start audio call">
           <Iconify icon="solar:phone-bold" />
         </IconButton>
 
         <IconButton onClick={handleVideoCall} disabled={!isUserMember} title="Start video call">
           <Iconify icon="solar:videocamera-record-bold" />
-        </IconButton>
-
-        <IconButton onClick={handleToggleNav}>
-          <Iconify icon={!collapseDesktop ? 'ri:sidebar-unfold-fill' : 'ri:sidebar-fold-fill'} />
         </IconButton>
 
         <IconButton onClick={popover.onOpen} disabled={!isUserMember}>

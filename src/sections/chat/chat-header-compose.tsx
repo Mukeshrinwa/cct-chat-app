@@ -1,6 +1,6 @@
 import type { IChatParticipant } from 'src/types/chat';
 
-import { useState, useCallback } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
@@ -9,7 +9,9 @@ import Avatar from '@mui/material/Avatar';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import Autocomplete from '@mui/material/Autocomplete';
+import CircularProgress from '@mui/material/CircularProgress';
 
+import { searchUsers } from 'src/api/user';
 import { varAlpha } from 'src/theme/styles';
 
 import { Iconify } from 'src/components/iconify';
@@ -24,6 +26,14 @@ type Props = {
 
 export function ChatHeaderCompose({ contacts, onAddRecipients }: Props) {
   const [searchRecipients, setSearchRecipients] = useState('');
+  const [options, setOptions] = useState<IChatParticipant[]>(contacts);
+  const [loading, setLoading] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Sync options when contacts list updates initially
+  useEffect(() => {
+    setOptions(contacts);
+  }, [contacts]);
 
   const handleAddRecipients = useCallback(
     (selected: IChatParticipant[]) => {
@@ -31,6 +41,48 @@ export function ChatHeaderCompose({ contacts, onAddRecipients }: Props) {
       onAddRecipients(selected);
     },
     [onAddRecipients]
+  );
+
+  const handleInputChange = useCallback(
+    (event: any, newValue: string) => {
+      setSearchRecipients(newValue);
+
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+
+      if (!newValue.trim()) {
+        setOptions(contacts);
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      debounceRef.current = setTimeout(async () => {
+        try {
+          const users = await searchUsers(newValue);
+          const mapped = users.map((u) => ({
+            id: u._id,
+            name: u.name,
+            username: u.username,
+            role: u.role || 'user',
+            email: '',
+            address: '',
+            avatarUrl: u.avatar || '',
+            phoneNumber: '',
+            lastActivity: u.lastSeen || new Date().toISOString(),
+            status: u.isOnline ? ('online' as const) : ('offline' as const),
+          }));
+          setOptions(mapped);
+        } catch (error) {
+          console.error('Failed to search users globally:', error);
+          setOptions([]);
+        } finally {
+          setLoading(false);
+        }
+      }, 400);
+    },
+    [contacts]
   );
 
   return (
@@ -46,13 +98,27 @@ export function ChatHeaderCompose({ contacts, onAddRecipients }: Props) {
         popupIcon={null}
         defaultValue={[]}
         disableCloseOnSelect
-        noOptionsText={<SearchNotFound query={searchRecipients} />}
+        noOptionsText={loading ? 'Searching...' : <SearchNotFound query={searchRecipients} />}
         onChange={(event, newValue) => handleAddRecipients(newValue)}
-        onInputChange={(event, newValue) => setSearchRecipients(newValue)}
-        options={contacts}
+        onInputChange={handleInputChange}
+        options={options}
         getOptionLabel={(recipient) => recipient.name}
         isOptionEqualToValue={(option, value) => option.id === value.id}
-        renderInput={(params) => <TextField {...params} placeholder="+ Recipients" />}
+        renderInput={(params) => (
+          <TextField
+            {...params}
+            placeholder="+ Recipients"
+            InputProps={{
+              ...params.InputProps,
+              endAdornment: (
+                <>
+                  {loading ? <CircularProgress color="inherit" size={20} /> : null}
+                  {params.InputProps.endAdornment}
+                </>
+              ),
+            }}
+          />
+        )}
         renderOption={(props, recipient, { selected }) => (
           <li {...props} key={recipient.id}>
             <Box
@@ -82,7 +148,7 @@ export function ChatHeaderCompose({ contacts, onAddRecipients }: Props) {
                     theme.transitions.create(['opacity'], {
                       easing: theme.transitions.easing.easeInOut,
                       duration: theme.transitions.duration.shorter,
-                    }),
+                      }),
                   ...(selected && { opacity: 1, color: 'primary.main' }),
                 }}
               >
@@ -90,7 +156,12 @@ export function ChatHeaderCompose({ contacts, onAddRecipients }: Props) {
               </Stack>
             </Box>
 
-            {recipient.name}
+            <Box>
+              <Typography variant="body2">{recipient.name}</Typography>
+              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                @{recipient.username || recipient.name}
+              </Typography>
+            </Box>
           </li>
         )}
         renderTags={(selected, getTagProps) =>

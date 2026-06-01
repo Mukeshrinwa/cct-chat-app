@@ -1,5 +1,6 @@
 import type { IChatParticipant } from 'src/types/chat';
 
+import { mutate } from 'swr';
 import { toast } from 'sonner';
 import { useState, useCallback } from 'react';
 
@@ -27,6 +28,7 @@ import { useRouter, useSearchParams } from 'src/routes/hooks';
 import { useBoolean } from 'src/hooks/use-boolean';
 
 import { useGetContacts } from 'src/actions/chat';
+import { useGroupStore } from 'src/store/useGroupStore';
 import {
   useGetGroups,
   leaveGroupById,
@@ -35,6 +37,7 @@ import {
 } from 'src/actions/group';
 
 import { Iconify } from 'src/components/iconify';
+import { ConfirmDialog } from 'src/components/custom-dialog';
 
 import { useMockedUser } from 'src/auth/hooks';
 
@@ -46,9 +49,10 @@ import { ChatRoomParticipantDialog } from './chat-room-participant-dialog';
 
 type Props = {
   participants: IChatParticipant[];
+  isUserMember?: boolean;
 };
 
-export function ChatRoomGroup({ participants }: Props) {
+export function ChatRoomGroup({ participants, isUserMember = true }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const selectedConversationId = searchParams.get('id') || '';
@@ -56,16 +60,22 @@ export function ChatRoomGroup({ participants }: Props) {
 
   const { groups } = useGetGroups();
   const { contacts } = useGetContacts();
+  const groupStoreGroups = useGroupStore((state) => state.groups);
 
-  const currentGroup = groups.find(
+  // Primary: match from SWR list (REST)
+  const currentGroupFromList = groups.find(
     (g: any) =>
       g.conversationId?._id === selectedConversationId ||
       g.conversationId === selectedConversationId
   );
 
-  // Debug: why `currentGroup` may be undefined (helps locate the Add member button)
-  // eslint-disable-next-line no-console
-  console.debug('[ChatRoomGroup] groups count:', groups?.length, 'selectedConversationId:', selectedConversationId, 'currentGroup:', currentGroup);
+  // Secondary: match from Zustand store (populated by socket events)
+  const currentGroupFromStore = groupStoreGroups[selectedConversationId];
+
+  const currentGroup = currentGroupFromList || currentGroupFromStore || null;
+
+  // groupId: prefer explicit _id, fallback to conversationId so add_members still works
+  const groupId = currentGroup?._id || currentGroup?.id || selectedConversationId;
 
   const collapse = useBoolean(true);
   const [selected, setSelected] = useState<IChatParticipant | null>(null);
@@ -76,7 +86,10 @@ export function ChatRoomGroup({ participants }: Props) {
   const [isLeavingGroup, setIsLeavingGroup] = useState(false);
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
 
-  const groupId = currentGroup?._id || currentGroup?.id;
+  // Custom Confirmation Modals State
+  const confirmRemove = useBoolean();
+  const [memberToRemove, setMemberToRemove] = useState<IChatParticipant | null>(null);
+  const confirmLeave = useBoolean();
 
   const existingParticipantIds = new Set(participants.map((participant) => participant.id));
 
@@ -120,6 +133,35 @@ export function ChatRoomGroup({ participants }: Props) {
         groupId,
         membersToAdd.map((member) => member.id)
       );
+
+      // ─── Optimistic update ──────────────────────────────────────────
+      // Immediately patch the conversation SWR cache so the
+      // "In room" participant list refreshes without a page reload.
+      // We set revalidate: false to prevent a race condition where the
+      // refetch completes before the database write is fully committed.
+      // The subsequent socket event will handle final safe revalidation.
+      const convCacheKey = `/api/v1/chats/conversations/${selectedConversationId}`;
+      mutate(
+        convCacheKey,
+        (current: any) => {
+          if (!current?.conversation) return current;
+          const existingIds = new Set(
+            current.conversation.participants.map((p: IChatParticipant) => p.id)
+          );
+          const freshParticipants = membersToAdd.filter((m) => !existingIds.has(m.id));
+          if (!freshParticipants.length) return current;
+          return {
+            ...current,
+            conversation: {
+              ...current.conversation,
+              participants: [...current.conversation.participants, ...freshParticipants],
+            },
+          };
+        },
+        { revalidate: false }
+      );
+      // ────────────────────────────────────────────────────────────────
+
       toast.success('Member(s) added successfully');
       setAddMembersOpen(false);
       setMembersToAdd([]);
@@ -128,42 +170,67 @@ export function ChatRoomGroup({ participants }: Props) {
     } finally {
       setIsAddingMembers(false);
     }
-  }, [groupId, membersToAdd]);
+  }, [groupId, membersToAdd, selectedConversationId]);
 
   const handleRemoveMember = useCallback(
-    async (member: IChatParticipant) => {
-      if (!groupId) {
-        toast.error('Group not found');
-        return;
-      }
-
-      const confirmRemove = window.confirm(`Remove ${member.name} from this group?`);
-      if (!confirmRemove) return;
-
-      try {
-        setRemovingMemberId(member.id);
-        await removeMemberFromGroup(groupId, member.id);
-        toast.success(`${member.name} removed from group`);
-      } catch (error: any) {
-        toast.error(error?.message || 'Failed to remove member');
-      } finally {
-        setRemovingMemberId(null);
-      }
+    (member: IChatParticipant) => {
+      setMemberToRemove(member);
+      confirmRemove.onTrue();
     },
-    [groupId]
+    [confirmRemove]
   );
 
+  const handleConfirmRemove = useCallback(async () => {
+    if (!groupId || !memberToRemove) {
+      toast.error('Group or member not found');
+      return;
+    }
+
+    try {
+      setRemovingMemberId(memberToRemove.id);
+      confirmRemove.onFalse();
+      await removeMemberFromGroup(groupId, memberToRemove.id);
+
+      // Optimistic update — remove participant from conversation cache instantly
+      mutate(
+        `/api/v1/chats/conversations/${selectedConversationId}`,
+        (current: any) => {
+          if (!current?.conversation) return current;
+          return {
+            ...current,
+            conversation: {
+              ...current.conversation,
+              participants: current.conversation.participants.filter(
+                (p: IChatParticipant) => p.id !== memberToRemove.id
+              ),
+            },
+          };
+        },
+        { revalidate: false }
+      );
+
+      toast.success(`${memberToRemove.name} removed from group`);
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to remove member');
+    } finally {
+      setRemovingMemberId(null);
+      setMemberToRemove(null);
+    }
+  }, [groupId, memberToRemove, selectedConversationId, confirmRemove]);
+
   const handleLeaveGroup = useCallback(async () => {
+    confirmLeave.onTrue();
+  }, [confirmLeave]);
+
+  const handleConfirmLeave = useCallback(async () => {
     if (!groupId) {
       toast.error('Group not found');
       return;
     }
 
-    const confirmLeave = window.confirm('Are you sure you want to leave this group?');
-    if (!confirmLeave) return;
-
     try {
       setIsLeavingGroup(true);
+      confirmLeave.onFalse();
       await leaveGroupById(groupId);
       toast.success('You left the group');
       router.push(paths.dashboard.chat);
@@ -172,57 +239,121 @@ export function ChatRoomGroup({ participants }: Props) {
     } finally {
       setIsLeavingGroup(false);
     }
-  }, [groupId, router]);
+  }, [groupId, router, confirmLeave]);
 
   const totalParticipants = participants.length;
 
-  const renderGroupInfo = currentGroup && (
-    <Stack alignItems="center" sx={{ py: 4, px: 2, position: 'relative' }}>
-      <IconButton
-        onClick={() => setSettingsOpen(true)}
-        sx={{ position: 'absolute', top: 10, right: 10 }}
-      >
-        <Iconify icon="solar:settings-bold" width={20} />
-      </IconButton>
+  const renderGroupInfo = (
+    <Stack alignItems="center" sx={{ py: 3, px: 2, position: 'relative', width: '100%' }}>
+      {/* Settings gear — only if we have group metadata */}
+      {currentGroup && isUserMember && (
+        <IconButton
+          onClick={() => setSettingsOpen(true)}
+          size="small"
+          sx={{ position: 'absolute', top: 8, right: 8 }}
+          title="Group settings"
+        >
+          <Iconify icon="solar:settings-bold" width={18} />
+        </IconButton>
+      )}
 
+      {/* Avatar */}
       <Avatar
-        alt={currentGroup.groupName}
-        src={currentGroup.groupAvatar}
-        sx={{ width: 88, height: 88, mb: 2 }}
+        alt={currentGroup?.groupName || 'Group'}
+        src={currentGroup?.groupAvatar || ''}
+        sx={{ width: 72, height: 72, mb: 1.5 }}
       />
-      <Typography variant="subtitle1" noWrap>
-        {currentGroup.groupName}
+
+      {/* Group name — bounded, no overflow */}
+      <Typography
+        variant="subtitle1"
+        noWrap
+        sx={{ maxWidth: '100%', px: 4, textAlign: 'center', fontWeight: 600 }}
+      >
+        {currentGroup?.groupName || 'Group Chat'}
       </Typography>
-      {currentGroup.description && (
-        <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5, textAlign: 'center' }}>
+
+      {/* Description — max 2 lines */}
+      {currentGroup?.description && (
+        <Typography
+          variant="caption"
+          sx={{
+            color: 'text.secondary',
+            mt: 0.5,
+            textAlign: 'center',
+            px: 2,
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+          }}
+        >
           {currentGroup.description}
         </Typography>
       )}
 
-      <Stack direction="row" spacing={1.2} sx={{ mt: 2 }}>
-        <Button
-          size="small"
-          variant="soft"
-          color="primary"
-          onClick={handleOpenAddMembers}
-          startIcon={<Iconify icon="solar:user-plus-bold" />}
-        >
-          Add member
-        </Button>
+      {/* Member count badge */}
+      <Typography variant="caption" sx={{ color: 'text.disabled', mt: 0.5 }}>
+        {participants.length} member{participants.length !== 1 ? 's' : ''}
+      </Typography>
 
-        <Button
+      {/* Action buttons — icon-only with tooltip to prevent overflow */}
+      <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
+        <IconButton
+          onClick={handleOpenAddMembers}
+          disabled={!isUserMember}
           size="small"
-          variant="soft"
-          color="error"
-          disabled={isLeavingGroup}
-          onClick={handleLeaveGroup}
-          startIcon={<Iconify icon="solar:logout-3-bold" />}
+          title="Add member"
+          sx={{
+            bgcolor: 'primary.soft',
+            color: 'primary.main',
+            border: '1px solid',
+            borderColor: 'primary.light',
+            borderRadius: 1.5,
+            px: 1.5,
+            py: 0.75,
+            gap: 0.75,
+            '&:hover': { bgcolor: 'primary.main', color: 'primary.contrastText' },
+            '&.Mui-disabled': { opacity: 0.5 },
+            fontSize: 12,
+            fontWeight: 600,
+          }}
         >
-          Leave group
-        </Button>
+          <Iconify icon="solar:user-plus-bold" width={16} />
+          <Box component="span" sx={{ fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}>
+            Add member
+          </Box>
+        </IconButton>
+
+        <IconButton
+          onClick={handleLeaveGroup}
+          disabled={isLeavingGroup || !isUserMember}
+          size="small"
+          title={isUserMember ? "Leave group" : "Already left group"}
+          sx={{
+            bgcolor: 'error.soft',
+            color: 'error.main',
+            border: '1px solid',
+            borderColor: 'error.light',
+            borderRadius: 1.5,
+            px: 1.5,
+            py: 0.75,
+            gap: 0.75,
+            '&:hover': { bgcolor: 'error.main', color: 'error.contrastText' },
+            '&.Mui-disabled': { opacity: 0.5 },
+            fontSize: 12,
+            fontWeight: 600,
+          }}
+        >
+          <Iconify icon="solar:logout-3-bold" width={16} />
+          <Box component="span" sx={{ fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}>
+            {isUserMember ? 'Leave' : 'Left'}
+          </Box>
+        </IconButton>
       </Stack>
     </Stack>
   );
+
 
   const renderList = (
     <>
@@ -245,7 +376,7 @@ export function ChatRoomGroup({ participants }: Props) {
             />
           </ListItemButton>
 
-          {participant.id !== user?.id && (
+          {isUserMember && participant.id !== user?.id && (
             <IconButton
               size="small"
               color="error"
@@ -268,16 +399,6 @@ export function ChatRoomGroup({ participants }: Props) {
   return (
     <>
       {renderGroupInfo}
-
-      {process.env.NODE_ENV !== 'production' && (
-        <Box sx={{ px: 2, pb: 1 }}>
-          <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-            {currentGroup
-              ? `Group: ${currentGroup.groupName || currentGroup.id}`
-              : `No group for conversation: ${selectedConversationId || 'none'}`}
-          </Typography>
-        </Box>
-      )}
 
       <CollapseButton
         selected={collapse.value}
@@ -351,6 +472,35 @@ export function ChatRoomGroup({ participants }: Props) {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {memberToRemove && (
+        <ConfirmDialog
+          open={confirmRemove.value}
+          onClose={() => {
+            confirmRemove.onFalse();
+            setMemberToRemove(null);
+          }}
+          title="Remove Member"
+          content={`Are you sure you want to remove ${memberToRemove.name} from this group?`}
+          action={
+            <Button variant="contained" color="error" onClick={handleConfirmRemove}>
+              Remove
+            </Button>
+          }
+        />
+      )}
+
+      <ConfirmDialog
+        open={confirmLeave.value}
+        onClose={confirmLeave.onFalse}
+        title="Leave Group"
+        content="Are you sure you want to leave this group?"
+        action={
+          <Button variant="contained" color="error" onClick={handleConfirmLeave}>
+            Leave
+          </Button>
+        }
+      />
     </>
   );
 }

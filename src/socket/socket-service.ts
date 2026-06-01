@@ -123,6 +123,10 @@ class SocketManager {
     this.emit('recording_stop', payload);
   }
 
+  public addMembers(payload: { groupId: string; members: string[] }) {
+    return this.emit('add_members', payload);
+  }
+
   public listenRecordingStatus(
     callback: (payload: { conversationId: string; userId: string; recording: boolean }) => void
   ) {

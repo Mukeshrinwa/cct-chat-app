@@ -64,6 +64,7 @@ type Props = {
   recipients: IChatParticipant[];
   selectedConversationId: string;
   onAddRecipients: (recipients: IChatParticipant[]) => void;
+  isUserMember?: boolean;
 };
 
 export function ChatMessageInput({
@@ -71,6 +72,7 @@ export function ChatMessageInput({
   recipients,
   onAddRecipients,
   selectedConversationId,
+  isUserMember = true,
 }: Props) {
   const router = useRouter();
 
@@ -488,38 +490,39 @@ export function ChatMessageInput({
           value={message}
           onKeyUp={handleSendMessage}
           onChange={handleChangeMessage}
-          placeholder="Type a message"
-          disabled={disabled}
+          placeholder={!isUserMember ? "You are no longer a member of this group" : "Type a message"}
+          disabled={disabled || !isUserMember}
           startAdornment={
             <Stack direction="row" sx={{ flexShrink: 0 }}>
-              <IconButton onClick={handleOpenEmoji} disabled={isRecording}>
+              <IconButton onClick={handleOpenEmoji} disabled={isRecording || !isUserMember}>
                 <Iconify icon="eva:smiling-face-fill" />
               </IconButton>
-              <IconButton onClick={handleOpenGif} disabled={isRecording}>
+              <IconButton onClick={handleOpenGif} disabled={isRecording || !isUserMember}>
                 <Iconify icon="mdi:gif" />
               </IconButton>
             </Stack>
           }
           endAdornment={
             <Stack direction="row" sx={{ flexShrink: 0 }}>
-              <IconButton onClick={handleAttach}>
+              <IconButton onClick={handleAttach} disabled={!isUserMember}>
                 <Iconify icon="solar:gallery-add-bold" />
               </IconButton>
-              <IconButton onClick={handleAttach}>
+              <IconButton onClick={handleAttach} disabled={!isUserMember}>
                 <Iconify icon="eva:attach-2-fill" />
               </IconButton>
               <IconButton
                 onClick={handleStartRecording}
                 color="default"
                 title="Click to record voice note"
+                disabled={!isUserMember}
               >
                 <Iconify icon="solar:microphone-bold" />
               </IconButton>
-              <IconButton onClick={handleSendClick} disabled={!message.trim()}>
+              <IconButton onClick={handleSendClick} disabled={!message.trim() || !isUserMember}>
                 <Iconify
                   icon="iconamoon:send-fill"
                   sx={{
-                    color: message.trim() ? 'primary.main' : 'text.disabled',
+                    color: (message.trim() && isUserMember) ? 'primary.main' : 'text.disabled',
                     transition: 'color 0.2s',
                   }}
                 />

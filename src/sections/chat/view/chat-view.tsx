@@ -62,6 +62,12 @@ export function ChatView() {
     )
     : [];
 
+  const isUserMember = conversation
+    ? conversation.participants.some(
+      (participant: any) => (participant.id || participant._id) === `${user?.id}`
+    )
+    : true;
+
   useEffect(() => {
     setActiveConversation(selectedConversationId || null);
   }, [selectedConversationId, setActiveConversation]);
@@ -97,6 +103,7 @@ export function ChatView() {
               collapseNav={roomNav}
               participants={participants}
               loading={conversationLoading}
+              isUserMember={isUserMember}
             />
           ) : (
             <ChatHeaderCompose contacts={contacts} onAddRecipients={handleAddRecipients} />
@@ -131,6 +138,7 @@ export function ChatView() {
                 onAddRecipients={handleAddRecipients}
                 selectedConversationId={selectedConversationId}
                 disabled={!recipients.length && !selectedConversationId}
+                isUserMember={isUserMember}
               />
             </>
           ),
@@ -140,6 +148,8 @@ export function ChatView() {
               participants={participants}
               loading={conversationLoading}
               messages={conversation?.messages ?? []}
+              conversationType={conversation?.type}
+              isUserMember={isUserMember}
             />
           ),
         }}

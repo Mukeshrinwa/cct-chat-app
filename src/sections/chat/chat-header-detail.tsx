@@ -34,9 +34,10 @@ type Props = {
   loading: boolean;
   participants: IChatParticipant[];
   collapseNav: UseNavCollapseReturn;
+  isUserMember?: boolean;
 };
 
-export function ChatHeaderDetail({ collapseNav, participants, loading }: Props) {
+export function ChatHeaderDetail({ collapseNav, participants, loading, isUserMember = true }: Props) {
   const popover = usePopover();
   const { startCall } = useCall();
 
@@ -127,11 +128,11 @@ export function ChatHeaderDetail({ collapseNav, participants, loading }: Props) 
       {group ? renderGroup : renderSingle}
 
       <Stack direction="row" flexGrow={1} justifyContent="flex-end">
-        <IconButton onClick={handleAudioCall} title="Start audio call">
+        <IconButton onClick={handleAudioCall} disabled={!isUserMember} title="Start audio call">
           <Iconify icon="solar:phone-bold" />
         </IconButton>
 
-        <IconButton onClick={handleVideoCall} title="Start video call">
+        <IconButton onClick={handleVideoCall} disabled={!isUserMember} title="Start video call">
           <Iconify icon="solar:videocamera-record-bold" />
         </IconButton>
 
@@ -139,7 +140,7 @@ export function ChatHeaderDetail({ collapseNav, participants, loading }: Props) 
           <Iconify icon={!collapseDesktop ? 'ri:sidebar-unfold-fill' : 'ri:sidebar-fold-fill'} />
         </IconButton>
 
-        <IconButton onClick={popover.onOpen}>
+        <IconButton onClick={popover.onOpen} disabled={!isUserMember}>
           <Iconify icon="eva:more-vertical-fill" />
         </IconButton>
       </Stack>

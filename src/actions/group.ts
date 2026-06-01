@@ -144,15 +144,33 @@ export async function deleteGroup(groupId: string) {
 
 export async function addMembersToGroup(groupId: string, members: string[]) {
   try {
-    const res = await axios.post(`/api/v1/groups/${groupId}/add-member`, { members });
+    let socketSent = false;
 
+    // Primary: emit via socket (backend will broadcast group_updated + system new_message)
+    try {
+      if (socketService.isConnected()) {
+        await socketService.emit('add_members', { groupId, members });
+        socketSent = true;
+        console.log('[Group] add_members emitted via socket');
+      }
+    } catch (socketError) {
+      console.warn('[Group] Socket add_members failed, falling back to HTTP:', socketError);
+    }
+
+    // Fallback: REST API
+    if (!socketSent) {
+      await axios.post(`/api/v1/groups/${groupId}/add-member`, { members });
+      console.log('[Group] add_members sent via HTTP fallback');
+    }
+
+    // Invalidate SWR caches so UI reflects the updated member list
     mutate('/api/v1/groups/list');
     mutate(`/api/v1/groups/${groupId}`);
     mutate('/api/v1/chats/conversations');
 
-    return res.data;
+    return { success: true };
   } catch (error) {
-    console.error('Failed to add group members:', error);
+    console.error('[Group] Failed to add group members:', error);
     throw error;
   }
 }

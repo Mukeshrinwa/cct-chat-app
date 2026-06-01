@@ -436,7 +436,7 @@ async function fetchConversationDetail(conversationId: string, currentUser: any)
   return {
     conversation: {
       id: realConvId,
-      type: conversationData?.type || (participants.length > 2 ? 'group' : 'direct'),
+      type: conversationData?.type || (participants.length > 1 ? 'group' : 'direct'),
       unreadCount: conversationData?.unreadCount || 0,
       messages: mappedMessages,
       participants,

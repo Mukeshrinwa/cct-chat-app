@@ -24,14 +24,25 @@ type Props = {
   participants: IChatParticipant[];
   collapseNav: UseNavCollapseReturn;
   messages: IChatConversation['messages'];
+  conversationType?: string;
+  isUserMember?: boolean;
 };
 
-export function ChatRoom({ collapseNav, participants, messages, loading }: Props) {
+export function ChatRoom({
+  collapseNav,
+  participants,
+  messages,
+  loading,
+  conversationType,
+  isUserMember = true,
+}: Props) {
   const theme = useTheme();
 
   const { collapseDesktop, openMobile, onCloseMobile } = collapseNav;
 
-  const group = participants.length > 1;
+  // Use conversation type from server as the source of truth.
+  // Fallback to participant count > 1 in case type is missing.
+  const group = conversationType === 'group' || participants.length > 1;
 
   const attachments = messages.map((msg) => msg.attachments).flat(1) || [];
 
@@ -41,7 +52,7 @@ export function ChatRoom({ collapseNav, participants, messages, loading }: Props
     <Scrollbar>
       <div>
         {group ? (
-          <ChatRoomGroup participants={participants} />
+          <ChatRoomGroup participants={participants} isUserMember={isUserMember} />
         ) : (
           <ChatRoomSingle participant={participants[0]} />
         )}

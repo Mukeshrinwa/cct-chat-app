@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { mutate, useSWRConfig } from 'swr';
 
 import { useChatStore } from 'src/store/useChatStore';
 import { useGroupStore } from 'src/store/useGroupStore';
@@ -13,6 +14,8 @@ import { useGroupRealtimeStore } from 'src/store/useGroupRealtimeStore';
 // ----------------------------------------------------------------------
 
 export const useGroupSockets = (currentUserId: string | undefined) => {
+  const { cache } = useSWRConfig(); // access in-memory SWR cache (no extra HTTP calls)
+
   useEffect(() => {
     const socket = socketManager.getSocket();
     if (!socket || !currentUserId) return undefined;
@@ -21,6 +24,14 @@ export const useGroupSockets = (currentUserId: string | undefined) => {
     // STRUCTURAL EVENTS
     // -----------------------------------------------------------------------
 
+    const getConversationId = (g: any): string => {
+      if (!g) return '';
+      if (typeof g.conversationId === 'object' && g.conversationId) {
+        return g.conversationId._id || g.conversationId.id || '';
+      }
+      return g.conversationId || '';
+    };
+
     const handleGroupCreated = (data: any) => {
       const { conversation, group } = data;
       useGroupStore.getState().setGroup(conversation._id, group);
@@ -28,19 +39,97 @@ export const useGroupSockets = (currentUserId: string | undefined) => {
 
     const handleGroupUpdated = (data: any) => {
       const { type, group, userId } = data;
-      useGroupStore.getState().updateGroup(group.conversationId, group);
+      const groupConvId = getConversationId(group);
+      useGroupStore.getState().updateGroup(groupConvId, group);
+
+      if (type === 'member_added') {
+        // ─── Optimistic update for ALL group members ────────────────────────
+        // Pull new member IDs from the updated group payload
+        const newMemberIds: string[] = group.members || [];
+        const convKey = `/api/v1/chats/conversations/${groupConvId}`;
+
+        mutate(
+          convKey,
+          (current: any) => {
+            if (!current?.conversation) return current;
+
+            const existingIds = new Set(
+              current.conversation.participants.map((p: any) => p.id || p._id)
+            );
+            const addedIds = newMemberIds.filter((id) => !existingIds.has(id));
+            if (!addedIds.length) return current;
+
+            // Look up full user objects from the already-loaded users SWR cache
+            const usersState = cache.get('/api/v1/users/get');
+            const allUsers: any[] = usersState?.data?.data || [];
+
+            const newParticipants = addedIds
+              .map((id) => allUsers.find((u: any) => (u._id || u.id) === id))
+              .filter(Boolean)
+              .map((u: any) => ({
+                id: u._id || u.id || '',
+                name: u.name || u.displayName || 'User',
+                username: u.username || '',
+                role: u.role || 'user',
+                email: u.email || '',
+                address: u.address || '',
+                avatarUrl: u.avatar || u.photoURL || '',
+                phoneNumber: u.mobile || u.phoneNumber || '',
+                lastActivity: u.lastSeen || new Date().toISOString(),
+                status: 'offline' as const,
+              }));
+
+            if (!newParticipants.length) return current; // still revalidates below
+
+            return {
+              ...current,
+              conversation: {
+                ...current.conversation,
+                participants: [...current.conversation.participants, ...newParticipants],
+              },
+            };
+          },
+          { revalidate: true } // background revalidate to stay in sync
+        );
+        // ───────────────────────────────────────────────────────────────────
+
+        mutate('/api/v1/groups/list');
+        mutate(`/api/v1/groups/${group._id}`);
+        mutate('/api/v1/chats/conversations');
+      }
 
       if (type === 'member_removed' || type === 'member_left') {
+        // Instantly remove the participant from the conversation cache
+        // for all remaining group members (including the current user)
+        if (userId) {
+          mutate(
+            `/api/v1/chats/conversations/${groupConvId}`,
+            (current: any) => {
+              if (!current?.conversation) return current;
+              return {
+                ...current,
+                conversation: {
+                  ...current.conversation,
+                  participants: current.conversation.participants.filter(
+                    (p: any) => (p.id || p._id) !== userId
+                  ),
+                },
+              };
+            },
+            { revalidate: true }
+          );
+        }
+
         if (userId === currentUserId) {
-          useGroupStore.getState().removeGroup(group.conversationId);
-          useGroupRealtimeStore.getState().clearConversation(group.conversationId);
+          useGroupStore.getState().removeGroup(groupConvId);
+          useGroupRealtimeStore.getState().clearConversation(groupConvId);
 
           const chatStore = useChatStore.getState();
-          if (chatStore.activeConversationId === group.conversationId) {
+          if (chatStore.activeConversationId === groupConvId) {
             chatStore.setActiveConversation(null);
           }
           const updatedConvs = chatStore.conversations.filter(
-            (c) => c._id !== group.conversationId
+            (c) => c._id !== groupConvId
           );
           chatStore.setConversations(updatedConvs);
 
@@ -74,7 +163,7 @@ export const useGroupSockets = (currentUserId: string | undefined) => {
 
       const callState = useGroupCallStore.getState();
       const groupEntry = Object.entries(useGroupStore.getState().groups).find(
-        ([, g]) => g.conversationId === conversationId
+        ([, g]) => getConversationId(g) === conversationId
       );
       if (groupEntry) {
         const [groupId] = groupEntry;
@@ -110,7 +199,6 @@ export const useGroupSockets = (currentUserId: string | undefined) => {
           alert('You were removed from this group by the Admin.');
         } else if (reason === 'left') {
           // eslint-disable-next-line no-alert
-          alert('You left the group.');
         }
       }
       const updatedConvs = chatStore.conversations.filter((c) => c._id !== conversationId);
@@ -129,8 +217,9 @@ export const useGroupSockets = (currentUserId: string | undefined) => {
     };
 
     const handleAddedToGroup = (group: any) => {
-      useGroupStore.getState().setGroup(group.conversationId, group);
+      useGroupStore.getState().setGroup(getConversationId(group), group);
     };
+
 
     // -----------------------------------------------------------------------
     // MESSAGING EVENTS
@@ -265,5 +354,7 @@ export const useGroupSockets = (currentUserId: string | undefined) => {
       socket.off('group_call_declined', handleGroupCallDeclined);
       socket.off('group_call_ended', handleGroupCallEnded);
     };
-  }, [currentUserId]);
+  }, [currentUserId, cache]);
 };
+
+

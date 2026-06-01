@@ -223,6 +223,7 @@ export function SocketProvider({ children }: SocketProviderProps) {
 
       const parsedMessage = {
         id: normalized.messageId,
+        _id: normalized._id || '',
         body: normalized.text,
         senderId,
         contentType: normalized.messageType,

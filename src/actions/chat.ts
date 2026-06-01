@@ -284,6 +284,7 @@ async function fetchConversationDetail(conversationId: string, currentUser: any)
     const normalized = normalizeMessage(msg);
     return {
       id: normalized?.messageId || '',
+      _id: normalized?._id || '',
       body: normalized?.text || '',
       senderId: normalized?.senderId || '',
       contentType: normalized?.messageType || 'text',

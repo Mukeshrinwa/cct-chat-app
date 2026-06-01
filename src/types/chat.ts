@@ -14,6 +14,7 @@ export type IChatAttachment = {
 
 export type IChatMessage = {
   id: string;
+  _id?: string;
   body: string;
   senderId: string;
   contentType: string;

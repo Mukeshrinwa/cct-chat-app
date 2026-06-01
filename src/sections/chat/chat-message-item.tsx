@@ -102,7 +102,7 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
   const handleEditSave = async () => {
     if (!editText.trim()) return;
     try {
-      await editMessage(message.id, editText, [], conversationId);
+      await editMessage(message._id || message.id, editText, [], conversationId);
       setIsEditing(false);
       toast.success('Message updated');
     } catch (error) {
@@ -115,7 +115,7 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
 
   const handleDeleteConfirm = async (deleteType: 'everyone' | 'me') => {
     try {
-      await deleteMessage(message.id, deleteType, conversationId);
+      await deleteMessage(message._id || message.id, deleteType, conversationId);
       toast.success('Message deleted');
       handleDeleteClose();
     } catch (error) {

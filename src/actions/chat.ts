@@ -660,7 +660,14 @@ export async function createConversation(conversationData: any) {
     }
   }
 
+  // Refresh immediately and again after a short delay to ensure sidebar updates
   mutate('/api/v1/chats/conversations');
+  setTimeout(() => {
+    mutate('/api/v1/chats/conversations');
+    if (newId) {
+      mutate(`/api/v1/chats/conversations/${newId}`);
+    }
+  }, 800);
 
   return {
     conversation: {

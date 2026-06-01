@@ -102,7 +102,25 @@ export function ChatView() {
   }, [conversation, selectedConversationId, router]);
 
   const handleAddRecipients = useCallback((selected: IChatParticipant[]) => {
+    if (selected.length === 1) {
+      const targetUser = selected[0];
+      const existingId = conversations.allIds.find((cId: string) => {
+        const c = conversations.byId[cId];
+        if (!c || c.type === 'GROUP' || c.participants.length > 2) return false;
+        return c.participants.some((p: any) => (p.id || p._id) === targetUser.id);
+      });
+
+      if (existingId) {
+        router.push(`${paths.dashboard.chat}?id=${existingId}`);
+        return;
+      }
+    }
     setRecipients(selected);
+  }, [conversations, router]);
+
+  // Called when user clicks a contact from sidebar search (new conversation)
+  const handleSelectContact = useCallback((contact: IChatParticipant) => {
+    setRecipients([contact]);
   }, []);
 
   const filteredMessages = useMemo(() => {
@@ -132,7 +150,11 @@ export function ChatView() {
               onSearchQueryChange={setSearchMessageQuery}
             />
           ) : (
-            <ChatHeaderCompose contacts={contacts} onAddRecipients={handleAddRecipients} />
+            <ChatHeaderCompose
+              contacts={contacts}
+              onAddRecipients={handleAddRecipients}
+              recipients={recipients}
+            />
           ),
           nav: (
             <ChatNav
@@ -141,6 +163,7 @@ export function ChatView() {
               loading={conversationsLoading}
               selectedConversationId={selectedConversationId}
               collapseNav={conversationsNav}
+              onSelectContact={handleSelectContact}
             />
           ),
           main: (

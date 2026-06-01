@@ -1,7 +1,7 @@
 import type { IChatParticipant } from 'src/types/chat';
 
 import { mutate } from 'swr';
-import { useRef, useMemo, useState, useCallback } from 'react';
+import { useRef, useMemo, useState, useEffect, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
@@ -100,6 +100,16 @@ export function ChatMessageInput({
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [message, setMessage] = useState('');
+
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (recipients.length > 0 && !selectedConversationId) {
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
+    }
+  }, [recipients, selectedConversationId]);
 
   const [emojiAnchor, setEmojiAnchor] = useState<HTMLButtonElement | null>(null);
 
@@ -485,6 +495,7 @@ export function ChatMessageInput({
         </Stack>
       ) : (
         <InputBase
+          inputRef={inputRef}
           name="chat-message"
           id="chat-message-input"
           value={message}

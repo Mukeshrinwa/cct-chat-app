@@ -203,7 +203,7 @@ export function JwtSignUpView() {
       });
 
       await checkUserSession?.();
-      router.refresh();
+      router.push(paths.dashboard.chat);
     } catch (error: any) {
       console.error(error);
       setErrorMsg(error.message || 'Registration failed');

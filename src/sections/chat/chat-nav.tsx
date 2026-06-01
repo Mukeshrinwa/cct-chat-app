@@ -42,6 +42,7 @@ type Props = {
   contacts: IChatParticipant[];
   collapseNav: UseNavCollapseReturn;
   conversations: IChatConversations;
+  onSelectContact?: (contact: IChatParticipant) => void;
 };
 
 export function ChatNav({
@@ -50,6 +51,7 @@ export function ChatNav({
   conversations,
   collapseNav,
   selectedConversationId,
+  onSelectContact,
 }: Props) {
   const theme = useTheme();
 
@@ -96,7 +98,7 @@ export function ChatNav({
     router.push(paths.dashboard.chat);
   }, [mdUp, onCloseMobile, router]);
 
-  // Local username search: filter only users who are already in our conversations/chats
+  // Search only within users who are already in our conversations
   const handleSearchContacts = useCallback((inputValue: string) => {
     setSearchContacts((prevState) => ({ ...prevState, query: inputValue }));
 
@@ -138,9 +140,26 @@ export function ChatNav({
     (result: IChatParticipant) => {
       handleClickAwaySearch();
 
-      router.push(`${paths.dashboard.chat}?id=${result.id}`);
+      // Check if we already have a direct conversation with this user
+      const existingConv = conversations.allIds.find((convId) => {
+        const conv = conversations.byId[convId];
+        if (!conv || conv.type === 'GROUP') return false;
+        return conv.participants.some((p) => p.id === result.id);
+      });
+
+      if (existingConv) {
+        // Navigate to the existing conversation
+        router.push(`${paths.dashboard.chat}?id=${existingConv}`);
+      } else if (onSelectContact) {
+        // New conversation: set as recipient via compose header
+        router.push(paths.dashboard.chat);
+        onSelectContact(result);
+      } else {
+        // Fallback: navigate with user ID (backend will handle)
+        router.push(`${paths.dashboard.chat}?id=${result.id}`);
+      }
     },
-    [handleClickAwaySearch, router]
+    [handleClickAwaySearch, router, conversations, onSelectContact]
   );
 
   const renderLoading = <ChatNavItemSkeleton />;

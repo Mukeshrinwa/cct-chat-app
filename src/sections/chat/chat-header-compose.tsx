@@ -1,9 +1,8 @@
 import type { IChatParticipant } from 'src/types/chat';
 
-import { useRef, useState, useEffect, useCallback } from 'react';
+import { useRef, useMemo, useState, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
-import Chip from '@mui/material/Chip';
 import Stack from '@mui/material/Stack';
 import Avatar from '@mui/material/Avatar';
 import TextField from '@mui/material/TextField';
@@ -22,23 +21,23 @@ import { SearchNotFound } from 'src/components/search-not-found';
 type Props = {
   contacts: IChatParticipant[];
   onAddRecipients: (selected: IChatParticipant[]) => void;
+  recipients: IChatParticipant[];
 };
 
-export function ChatHeaderCompose({ contacts, onAddRecipients }: Props) {
+export function ChatHeaderCompose({ contacts, onAddRecipients, recipients }: Props) {
   const [searchRecipients, setSearchRecipients] = useState('');
-  const [options, setOptions] = useState<IChatParticipant[]>(contacts);
+  const [options, setOptions] = useState<IChatParticipant[]>([]);
   const [loading, setLoading] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Sync options when contacts list updates initially
-  useEffect(() => {
-    setOptions(contacts);
-  }, [contacts]);
-
   const handleAddRecipients = useCallback(
-    (selected: IChatParticipant[]) => {
+    (selected: IChatParticipant | null) => {
       setSearchRecipients('');
-      onAddRecipients(selected);
+      if (selected) {
+        onAddRecipients([selected]);
+      } else {
+        onAddRecipients([]);
+      }
     },
     [onAddRecipients]
   );
@@ -52,7 +51,7 @@ export function ChatHeaderCompose({ contacts, onAddRecipients }: Props) {
       }
 
       if (!newValue.trim()) {
-        setOptions(contacts);
+        setOptions([]);
         setLoading(false);
         return;
       }
@@ -82,101 +81,88 @@ export function ChatHeaderCompose({ contacts, onAddRecipients }: Props) {
         }
       }, 400);
     },
-    [contacts]
+    []
   );
 
-  return (
-    <>
-      <Typography variant="subtitle2" sx={{ color: 'text.primary', mr: 2 }}>
-        To:
-      </Typography>
+  const value = recipients[0] || null;
 
-      <Autocomplete
-        sx={{ minWidth: { md: 320 }, flexGrow: { xs: 1, md: 'unset' } }}
-        multiple
-        limitTags={3}
-        popupIcon={null}
-        defaultValue={[]}
-        disableCloseOnSelect
-        noOptionsText={loading ? 'Searching...' : <SearchNotFound query={searchRecipients} />}
-        onChange={(event, newValue) => handleAddRecipients(newValue)}
-        onInputChange={handleInputChange}
-        options={options}
-        getOptionLabel={(recipient) => recipient.name}
-        isOptionEqualToValue={(option, value) => option.id === value.id}
-        renderInput={(params) => (
-          <TextField
-            {...params}
-            placeholder="+ Recipients"
-            InputProps={{
-              ...params.InputProps,
-              endAdornment: (
-                <>
-                  {loading ? <CircularProgress color="inherit" size={20} /> : null}
-                  {params.InputProps.endAdornment}
-                </>
-              ),
+  const autocompleteOptions = useMemo(() => {
+    if (!searchRecipients.trim() && value) {
+      return [value];
+    }
+    return options;
+  }, [options, searchRecipients, value]);
+
+  return (
+    <Autocomplete
+      sx={{ minWidth: { md: 320 }, flexGrow: { xs: 1, md: 'unset' } }}
+      popupIcon={null}
+      noOptionsText={loading ? 'Searching...' : <SearchNotFound query={searchRecipients} />}
+      onChange={(event, newValue) => handleAddRecipients(newValue)}
+      onInputChange={handleInputChange}
+      options={autocompleteOptions}
+      value={value}
+      getOptionLabel={(recipient) => recipient.name}
+      isOptionEqualToValue={(option, val) => option.id === val.id}
+      renderInput={(params) => (
+        <TextField
+          {...params}
+          placeholder="Search user..."
+          InputProps={{
+            ...params.InputProps,
+            endAdornment: (
+              <>
+                {loading ? <CircularProgress color="inherit" size={20} /> : null}
+                {params.InputProps.endAdornment}
+              </>
+            ),
+          }}
+        />
+      )}
+      renderOption={(props, recipient, { selected }) => (
+        <li {...props} key={recipient.id}>
+          <Box
+            sx={{
+              mr: 1,
+              width: 32,
+              height: 32,
+              overflow: 'hidden',
+              borderRadius: '50%',
+              position: 'relative',
             }}
-          />
-        )}
-        renderOption={(props, recipient, { selected }) => (
-          <li {...props} key={recipient.id}>
-            <Box
-              key={recipient.id}
+          >
+            <Avatar alt={recipient.name} src={recipient.avatarUrl} sx={{ width: 1, height: 1 }} />
+            <Stack
+              alignItems="center"
+              justifyContent="center"
               sx={{
-                mr: 1,
-                width: 32,
-                height: 32,
-                overflow: 'hidden',
-                borderRadius: '50%',
-                position: 'relative',
+                top: 0,
+                left: 0,
+                width: 1,
+                height: 1,
+                opacity: 0,
+                position: 'absolute',
+                bgcolor: (theme) => varAlpha(theme.vars.palette.grey['900Channel'], 0.8),
+                transition: (theme) =>
+                  theme.transitions.create(['opacity'], {
+                    easing: theme.transitions.easing.easeInOut,
+                    duration: theme.transitions.duration.shorter,
+                  }),
+                ...(selected && { opacity: 1, color: 'primary.main' }),
               }}
             >
-              <Avatar alt={recipient.name} src={recipient.avatarUrl} sx={{ width: 1, height: 1 }} />
-              <Stack
-                alignItems="center"
-                justifyContent="center"
-                sx={{
-                  top: 0,
-                  left: 0,
-                  width: 1,
-                  height: 1,
-                  opacity: 0,
-                  position: 'absolute',
-                  bgcolor: (theme) => varAlpha(theme.vars.palette.grey['900Channel'], 0.8),
-                  transition: (theme) =>
-                    theme.transitions.create(['opacity'], {
-                      easing: theme.transitions.easing.easeInOut,
-                      duration: theme.transitions.duration.shorter,
-                      }),
-                  ...(selected && { opacity: 1, color: 'primary.main' }),
-                }}
-              >
-                <Iconify icon="eva:checkmark-fill" />
-              </Stack>
-            </Box>
+              <Iconify icon="eva:checkmark-fill" />
+            </Stack>
+          </Box>
 
-            <Box>
-              <Typography variant="body2">{recipient.name}</Typography>
-              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                @{recipient.username || recipient.name}
-              </Typography>
-            </Box>
-          </li>
-        )}
-        renderTags={(selected, getTagProps) =>
-          selected.map((recipient, index) => (
-            <Chip
-              {...getTagProps({ index })}
-              key={recipient.id}
-              label={recipient.name}
-              avatar={<Avatar alt={recipient.name} src={recipient.avatarUrl} />}
-              size="small"
-              variant="soft"
-            />
-          ))
-        }
-      />
-    </>
+          <Box>
+            <Typography variant="body2">{recipient.name}</Typography>
+            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+              @{recipient.username || recipient.name}
+            </Typography>
+          </Box>
+        </li>
+      )}
+    />
   );
 }

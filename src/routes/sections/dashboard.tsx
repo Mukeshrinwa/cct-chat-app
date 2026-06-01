@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, Navigate } from 'react-router-dom';
 
 import { CONFIG } from 'src/config-global';
 import { DashboardLayout } from 'src/layouts/dashboard';
@@ -9,11 +9,6 @@ import { LoadingScreen } from 'src/components/loading-screen';
 import { AuthGuard } from 'src/auth/guard';
 
 // ----------------------------------------------------------------------
-
-// Overview
-const IndexPage = lazy(() => import('src/pages/dashboard'));
-
-
 
 // App
 const ChatPage = lazy(() => import('src/pages/dashboard/chat'));
@@ -38,7 +33,7 @@ export const dashboardRoutes = [
       {
         element: CONFIG.auth.skip ? <>{layoutContent}</> : <AuthGuard>{layoutContent}</AuthGuard>,
         children: [
-          { element: <IndexPage />, index: true },
+          { element: <Navigate to="/dashboard/chat" replace />, index: true },
      
         ],
       },

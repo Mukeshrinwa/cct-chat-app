@@ -16,6 +16,8 @@ import AvatarGroup, { avatarGroupClasses } from '@mui/material/AvatarGroup';
 
 import { useSearchParams } from 'src/routes/hooks';
 
+import { useResponsive } from 'src/hooks/use-responsive';
+
 import { fToNow } from 'src/utils/format-time';
 
 import { useCall } from 'src/call';
@@ -26,17 +28,21 @@ import { usePopover, CustomPopover } from 'src/components/custom-popover';
 
 import { ChatHeaderSkeleton } from './chat-skeleton';
 
+import type { UseNavCollapseReturn } from './hooks/use-collapse-nav';
+
 // ----------------------------------------------------------------------
 
 type Props = {
   loading: boolean;
   participants: IChatParticipant[];
+  collapseNav: UseNavCollapseReturn;
   isUserMember?: boolean;
   searchQuery: string;
   onSearchQueryChange: (query: string) => void;
 };
 
 export function ChatHeaderDetail({
+  collapseNav,
   participants,
   loading,
   isUserMember = true,
@@ -49,6 +55,19 @@ export function ChatHeaderDetail({
   const searchParams = useSearchParams();
   const conversationId = searchParams.get('id') || '';
   const { recordingUsers, typingUsers, onlineUsers } = useSocket();
+
+  const lgUp = useResponsive('up', 'lg');
+
+  const { collapseDesktop, onCollapseDesktop, onOpenMobile } = collapseNav;
+
+  const handleToggleNav = useCallback(() => {
+    if (lgUp) {
+      onCollapseDesktop();
+    } else {
+      onOpenMobile();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lgUp]);
 
 
   const group = participants.length > 1;
@@ -159,6 +178,10 @@ export function ChatHeaderDetail({
 
         <IconButton onClick={handleVideoCall} disabled={!isUserMember} title="Start video call">
           <Iconify icon="solar:videocamera-record-bold" />
+        </IconButton>
+
+        <IconButton onClick={handleToggleNav}>
+          <Iconify icon={!collapseDesktop ? 'ri:sidebar-unfold-fill' : 'ri:sidebar-fold-fill'} />
         </IconButton>
 
         <IconButton onClick={popover.onOpen} disabled={!isUserMember}>

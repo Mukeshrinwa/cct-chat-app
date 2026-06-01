@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useRef, useState, useEffect, useCallback } from 'react';
 
+import Box from '@mui/material/Box';
 import List from '@mui/material/List';
 import Stack from '@mui/material/Stack';
 import Dialog from '@mui/material/Dialog';
@@ -9,6 +10,7 @@ import Divider from '@mui/material/Divider';
 import Checkbox from '@mui/material/Checkbox';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
+import IconButton from '@mui/material/IconButton';
 import LoadingButton from '@mui/lab/LoadingButton';
 import DialogTitle from '@mui/material/DialogTitle';
 import ListItemText from '@mui/material/ListItemText';
@@ -36,14 +38,47 @@ type Props = {
 export function ChatGroupCreateDialog({ open, onClose }: Props) {
   const router = useRouter();
 
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [groupName, setGroupName] = useState('');
   const [groupAvatar, setGroupAvatar] = useState('');
+  const [avatarPreview, setAvatarPreview] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   
   const [users, setUsers] = useState<UserData[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  const handleAvatarFileChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select a valid image file');
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Image size must be less than 2MB');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64String = reader.result as string;
+      setGroupAvatar(base64String);
+      setAvatarPreview(base64String);
+    };
+    reader.readAsDataURL(file);
+  }, []);
+
+  const handleRemoveAvatar = () => {
+    setGroupAvatar('');
+    setAvatarPreview('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
 
   useEffect(() => {
     async function fetchUsers() {
@@ -67,8 +102,12 @@ export function ChatGroupCreateDialog({ open, onClose }: Props) {
     if (!open) {
       setGroupName('');
       setGroupAvatar('');
+      setAvatarPreview('');
       setSearchQuery('');
       setSelectedIds([]);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   }, [open]);
 
@@ -152,14 +191,57 @@ export function ChatGroupCreateDialog({ open, onClose }: Props) {
             size="small"
           />
 
-          <TextField
-            fullWidth
-            label="Group Avatar URL"
-            placeholder="https://example.com/avatar.png"
-            value={groupAvatar}
-            onChange={(e) => setGroupAvatar(e.target.value)}
-            size="small"
-          />
+          <Stack direction="row" alignItems="center" spacing={3} sx={{ py: 1 }}>
+            <Box sx={{ position: 'relative' }}>
+              <Avatar
+                src={avatarPreview}
+                alt="Group Avatar"
+                sx={{
+                  width: 64,
+                  height: 64,
+                  border: (theme) => `2px solid ${theme.vars.palette.primary.main}`,
+                }}
+              >
+                <Iconify icon="solar:users-group-two-rounded-bold" width={32} />
+              </Avatar>
+
+              <IconButton
+                onClick={() => fileInputRef.current?.click()}
+                sx={{
+                  position: 'absolute',
+                  bottom: -4,
+                  right: -4,
+                  width: 24,
+                  height: 24,
+                  bgcolor: 'primary.main',
+                  color: 'primary.contrastText',
+                  '&:hover': { bgcolor: 'primary.dark' },
+                }}
+              >
+                <Iconify icon="solar:camera-bold" width={12} />
+              </IconButton>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarFileChange}
+                style={{ display: 'none' }}
+              />
+            </Box>
+
+            <Stack spacing={0.5} alignItems="flex-start">
+              <Typography variant="subtitle2">Group Photo</Typography>
+              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                Upload an image for the group profile
+              </Typography>
+              {avatarPreview && (
+                <Button size="small" color="error" onClick={handleRemoveAvatar} sx={{ p: 0, minWidth: 0, height: 'auto', textTransform: 'none' }}>
+                  Remove photo
+                </Button>
+              )}
+            </Stack>
+          </Stack>
 
           <Divider sx={{ my: 1 }} />
 

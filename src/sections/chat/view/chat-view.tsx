@@ -19,6 +19,7 @@ import { useMockedUser } from 'src/auth/hooks';
 
 import { Layout } from '../layout';
 import { ChatNav } from '../chat-nav';
+import { ChatRoom } from '../chat-room';
 import { ChatMessageList } from '../chat-message-list';
 import { ChatMessageInput } from '../chat-message-input';
 import { ChatHeaderDetail } from '../chat-header-detail';
@@ -66,6 +67,8 @@ export function ChatView() {
   const { conversation, conversationError, conversationLoading } = useGetConversation(
     `${selectedConversationId}`
   );
+
+  const roomNav = useCollapseNav();
 
   const conversationsNav = useCollapseNav();
 
@@ -121,6 +124,7 @@ export function ChatView() {
         slots={{
           header: selectedConversationId ? (
             <ChatHeaderDetail
+              collapseNav={roomNav}
               participants={participants}
               loading={conversationLoading}
               isUserMember={isUserMember}
@@ -164,7 +168,16 @@ export function ChatView() {
               />
             </>
           ),
-          details: null,
+          details: selectedConversationId && (
+            <ChatRoom
+              collapseNav={roomNav}
+              participants={participants}
+              loading={conversationLoading}
+              messages={conversation?.messages ?? []}
+              conversationType={conversation?.type}
+              isUserMember={isUserMember}
+            />
+          ),
         }}
       />
     </Box>

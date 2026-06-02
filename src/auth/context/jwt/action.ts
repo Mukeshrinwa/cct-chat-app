@@ -24,10 +24,7 @@ export type SignUpParams = {
  * Send OTP
  *************************************** */
 export const sendOtp = async (mobile: string): Promise<void> => {
-  let finalMobile = mobile.trim();
-  if (!finalMobile.startsWith('+')) {
-    finalMobile = `+91${finalMobile}`;
-  }
+  const finalMobile = mobile.trim();
   try {
     await axios.post(endpoints.auth.sendOtp, { mobile: finalMobile });
   } catch (error: any) {
@@ -44,10 +41,7 @@ export const verifyOtp = async (
   otp: string,
   deviceType: string = 'web'
 ): Promise<void> => {
-  let finalMobile = mobile.trim();
-  if (!finalMobile.startsWith('+')) {
-    finalMobile = `+91${finalMobile}`;
-  }
+  const finalMobile = mobile.trim();
   try {
     await axios.post(endpoints.auth.verifyOtp, { mobile: finalMobile, otp, deviceType });
   } catch (error: any) {
@@ -83,10 +77,7 @@ export const signUp = async ({
   about,
   role,
 }: SignUpParams): Promise<void> => {
-  let finalMobile = mobile.trim();
-  if (!finalMobile.startsWith('+')) {
-    finalMobile = `+91${finalMobile}`;
-  }
+  const finalMobile = mobile.trim();
 
   const params = {
     mobile: finalMobile,
@@ -123,10 +114,7 @@ export const signInWithPassword = async ({ identifier, password }: SignInParams)
     const trimmed = identifier.trim();
     const isMobile = /^\+?\d{7,15}$/.test(trimmed);
 
-    let finalIdentifier = trimmed;
-    if (isMobile && !trimmed.startsWith('+')) {
-      finalIdentifier = `+91${trimmed}`;
-    }
+    const finalIdentifier = trimmed;
 
     const params = isMobile
       ? { mobile: finalIdentifier, password }

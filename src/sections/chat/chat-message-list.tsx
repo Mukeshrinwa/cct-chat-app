@@ -59,7 +59,7 @@ export function ChatMessageList({ messages = [], participants, loading }: Props)
             top: '50%',
             left: '50%',
             transform: 'translate(-50%, -50%)',
-            width: { xs: 160, sm: 220, md: 690 },
+            width: { xs: 360, sm: 220, md: 690 },
             height: 'auto',
             opacity: 0.05,
             pointerEvents: 'none',

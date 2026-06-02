@@ -209,9 +209,19 @@ export function ChatMessageInput({
     try {
       const gifMessageData = {
         id: uuidv4(),
-        attachments: [],
-        body: gifUrl,
-        contentType: 'gif',
+        attachments: [
+          {
+            name: 'giphy.gif',
+            size: 0,
+            type: 'image/gif',
+            path: gifUrl,
+            preview: gifUrl,
+            createdAt: new Date().toISOString(),
+            modifiedAt: new Date().toISOString(),
+          }
+        ],
+        body: 'gif',
+        contentType: 'document',
         createdAt: fSub({ minutes: 1 }),
         senderId: myContact.id,
       };

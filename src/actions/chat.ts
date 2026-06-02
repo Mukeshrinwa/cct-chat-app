@@ -550,10 +550,17 @@ export async function sendMessage(conversationId: string, messageData: IChatMess
     mutate(`/api/v1/chats/conversations/${realConvId}`, updateConversationCache, { revalidate: false });
   }
 
-  // 2. Send message via socket or HTTP
   let socketSent = false;
   const msgType = messageData.contentType || 'text';
-  const isFileMessage = msgType === 'image' || msgType === 'audio' || msgType === 'video' || msgType === 'document';
+  const firstAttachmentUrl = messageData.attachments?.[0]?.path || messageData.attachments?.[0]?.preview || '';
+  const isGifUrl = (typeof messageData.body === 'string' &&
+    (messageData.body.startsWith('http://') || messageData.body.startsWith('https://')) &&
+    (messageData.body.toLowerCase().includes('giphy') || messageData.body.toLowerCase().includes('.gif'))) ||
+    (typeof firstAttachmentUrl === 'string' &&
+    (firstAttachmentUrl.startsWith('http://') || firstAttachmentUrl.startsWith('https://')) &&
+    (firstAttachmentUrl.toLowerCase().includes('giphy') || firstAttachmentUrl.toLowerCase().includes('.gif')));
+  const isGifDocument = msgType === 'document' && isGifUrl;
+  const isFileMessage = (msgType === 'image' || msgType === 'audio' || msgType === 'video' || msgType === 'document') && !isGifDocument;
 
   if (isFileMessage) {
     // File messages — upload via FormData to /api/v1/files/upload
@@ -587,14 +594,15 @@ export async function sendMessage(conversationId: string, messageData: IChatMess
       console.error(`[${msgType.toUpperCase()}_UPLOAD] Failed:`, uploadError);
     }
   } else {
-    // Text or gif messages — send via socket
+    // Text, gif or GIF-document messages — send via socket
     try {
       if (socketService.isConnected()) {
         await socketService.emit('send_message', {
           messageId: messageData.id,
           conversationId: realConvId,
-          text: messageData.body,
-          type: msgType === 'gif' ? 'gif' : 'text',
+          text: isGifDocument ? 'gif' : messageData.body,
+          type: isGifDocument ? 'document' : (msgType === 'gif' ? 'gif' : 'text'),
+          attachments: messageData.attachments || [],
         });
         socketSent = true;
         console.log('Message sent via socket');
@@ -607,8 +615,9 @@ export async function sendMessage(conversationId: string, messageData: IChatMess
     if (!socketSent) {
       await axios.post('/api/v1/chats/message', {
         conversationId: realConvId,
-        text: messageData.body,
-        type: msgType === 'gif' ? 'gif' : 'text',
+        text: isGifDocument ? 'gif' : messageData.body,
+        type: isGifDocument ? 'document' : (msgType === 'gif' ? 'gif' : 'text'),
+        attachments: messageData.attachments || [],
       });
       console.log('Message sent via HTTP API fallback');
     }

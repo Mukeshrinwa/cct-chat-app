@@ -10,21 +10,25 @@ const PORT = 8080;
 
 const _env = loadEnv('all', process.cwd());
 
-export default defineConfig({
-  // base: env.VITE_BASE_PATH,
-  plugins: [
-    react(),
-    checker({
-      typescript: true,
-      eslint: {
-        lintCommand: 'eslint "./src/**/*.{js,jsx,ts,tsx}"',
-      },
-      overlay: {
-        position: 'tl',
-        initialIsOpen: false,
-      },
-    }),
-  ],
+export default defineConfig(({ mode }) => {
+  const isProd = mode === 'production';
+
+  return {
+    // base: env.VITE_BASE_PATH,
+    plugins: [
+      react(),
+      !isProd &&
+        checker({
+          typescript: true,
+          eslint: {
+            lintCommand: 'eslint "./src/**/*.{js,jsx,ts,tsx}"',
+          },
+          overlay: {
+            position: 'tl',
+            initialIsOpen: false,
+          },
+        }),
+    ].filter(Boolean),
   resolve: {
     alias: [
       {
@@ -39,4 +43,5 @@ export default defineConfig({
   },
   server: { port: PORT, host: true },
   preview: { port: PORT, host: true },
+  };
 });

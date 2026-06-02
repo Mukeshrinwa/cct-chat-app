@@ -10,6 +10,7 @@ export type IChatAttachment = {
   preview: string;
   createdAt: IDateValue;
   modifiedAt: IDateValue;
+  url?: string;
 };
 
 export type IChatMessage = {

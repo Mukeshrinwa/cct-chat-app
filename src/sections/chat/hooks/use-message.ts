@@ -18,7 +18,7 @@ export function useMessage({ message, participants, currentUserId }: Props) {
 
   const me = senderDetails.type === 'me';
 
-  const firstAttachmentUrl = message.attachments?.[0]?.preview || message.attachments?.[0]?.path || '';
+  const firstAttachmentUrl = message.attachments?.[0]?.url || message.attachments?.[0]?.preview || message.attachments?.[0]?.path || '';
   const firstAttachmentType = message.attachments?.[0]?.type || '';
 
   const hasImage =

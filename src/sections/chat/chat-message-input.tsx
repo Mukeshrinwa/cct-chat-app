@@ -214,6 +214,7 @@ export function ChatMessageInput({
             name: 'giphy.gif',
             size: 0,
             type: 'image/gif',
+            url: gifUrl,
             path: gifUrl,
             preview: gifUrl,
             createdAt: new Date().toISOString(),

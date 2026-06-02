@@ -552,7 +552,7 @@ export async function sendMessage(conversationId: string, messageData: IChatMess
 
   let socketSent = false;
   const msgType = messageData.contentType || 'text';
-  const firstAttachmentUrl = messageData.attachments?.[0]?.path || messageData.attachments?.[0]?.preview || '';
+  const firstAttachmentUrl = messageData.attachments?.[0]?.url || messageData.attachments?.[0]?.path || messageData.attachments?.[0]?.preview || '';
   const isGifUrl = (typeof messageData.body === 'string' &&
     (messageData.body.startsWith('http://') || messageData.body.startsWith('https://')) &&
     (messageData.body.toLowerCase().includes('giphy') || messageData.body.toLowerCase().includes('.gif'))) ||

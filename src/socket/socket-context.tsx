@@ -7,8 +7,9 @@ import React, { useMemo, useState, useEffect, useContext, createContext } from '
 
 import { normalizeMessage } from 'src/utils/chat-utils';
 
-import { useChatStore } from 'src/store/useChatStore';
+import { clickConversation } from 'src/actions/chat';
 import { useAuthStore } from 'src/store/useAuthStore';
+import { useChatStore } from 'src/store/useChatStore';
 
 import { useAuthContext } from 'src/auth/hooks';
 
@@ -221,6 +222,10 @@ export function SocketProvider({ children }: SocketProviderProps) {
 
       const { conversationId, senderId } = normalized;
 
+      if (conversationId && conversationId === activeConvId && senderId !== currentUserId) {
+        clickConversation(conversationId);
+      }
+
       const parsedMessage = {
         id: normalized.messageId,
         _id: normalized._id || '',
@@ -298,8 +303,9 @@ export function SocketProvider({ children }: SocketProviderProps) {
               },
               lastMessageAt: parsedMessage.createdAt,
               unreadCount:
-                (conv.unreadCount || 0) +
-                (parsedMessage.senderId !== currentUserId ? 1 : 0),
+                conversationId === activeConvId
+                  ? 0
+                  : (conv.unreadCount || 0) + (parsedMessage.senderId !== currentUserId ? 1 : 0),
             };
             updatedList.splice(index, 1);
             updatedList.unshift(updatedConv);
@@ -547,6 +553,53 @@ export function SocketProvider({ children }: SocketProviderProps) {
       }
     );
 
+    // -----------------------------------------------------------------------
+    // 13. MESSAGES READ - messages_read
+    // -----------------------------------------------------------------------
+    socketInstance.on(
+      'messages_read',
+      (payload: { conversationId: string; readBy: string }) => {
+        const { conversationId, readBy } = payload;
+        if (!conversationId) return;
+
+        // 1. Update unreadCount locally in conversations list
+        mutate(
+          '/api/v1/chats/conversations',
+          (current: any) => {
+            if (!current || !current.data) return current;
+            return {
+              ...current,
+              data: current.data.map((c: any) =>
+                c._id === conversationId ? { ...c, unreadCount: readBy === currentUserId ? 0 : c.unreadCount } : c
+              ),
+            };
+          },
+          { revalidate: false }
+        );
+
+        // 2. Mark messages as read in the conversation cache
+        mutate(
+          `/api/v1/chats/conversations/${conversationId}`,
+          (current: any) => {
+            if (!current || !current.conversation) return current;
+            return {
+              ...current,
+              conversation: {
+                ...current.conversation,
+                messages: current.conversation.messages.map((m: any) => {
+                  if (m.senderId !== readBy) {
+                    return { ...m, status: 'read' };
+                  }
+                  return m;
+                }),
+              },
+            };
+          },
+          { revalidate: false }
+        );
+      }
+    );
+
     // NOTE: call_* events (incoming_call, call_accepted, etc.)
     // are intentionally NOT handled here — they are managed in CallContext.
 
@@ -569,6 +622,7 @@ export function SocketProvider({ children }: SocketProviderProps) {
       socketInstance.off('disappearing_mode_update');
       socketInstance.off('upload_completed');
       socketInstance.off('message_reaction');
+      socketInstance.off('messages_read');
       Object.values(typingTimeouts).forEach(clearTimeout);
     };
   }, [token, currentUserId]);

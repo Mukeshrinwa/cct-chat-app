@@ -11,7 +11,7 @@ import { useGroupSockets } from 'src/hooks/use-group-sockets';
 
 import { CONFIG } from 'src/config-global';
 import { useChatStore } from 'src/store/useChatStore';
-import { useGetContacts, useGetConversation, useGetConversations } from 'src/actions/chat';
+import { useGetContacts, clickConversation, useGetConversation, useGetConversations } from 'src/actions/chat';
 
 import { EmptyContent } from 'src/components/empty-content';
 
@@ -87,6 +87,9 @@ export function ChatView() {
   useEffect(() => {
     setActiveConversation(selectedConversationId || null);
     setSearchMessageQuery('');
+    if (selectedConversationId) {
+      clickConversation(selectedConversationId);
+    }
   }, [selectedConversationId, setActiveConversation]);
 
   useEffect(() => {

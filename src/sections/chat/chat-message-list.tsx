@@ -1,5 +1,6 @@
 import type { IChatMessage, IChatParticipant } from 'src/types/chat';
 
+import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import LinearProgress from '@mui/material/LinearProgress';
 
@@ -46,16 +47,39 @@ export function ChatMessageList({ messages = [], participants, loading }: Props)
 
   return (
     <>
-      <Scrollbar ref={messagesEndRef} sx={{ px: 3, pt: 5, pb: 3, flex: '1 1 auto' }}>
-        {messages.map((message) => (
-          <ChatMessageItem
-            key={message.id}
-            message={message}
-            participants={participants}
-            onOpenLightbox={() => lightbox.onOpen(message.body)}
-          />
-        ))}
-      </Scrollbar>
+      {/* Chat background with logo watermark */}
+      <Box sx={{ flex: '1 1 auto', position: 'relative', overflow: 'hidden' }}>
+        {/* Logo watermark */}
+        <Box
+          component="img"
+          src="/logo/logo.png"
+          alt="watermark"
+          sx={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: { xs: 160, sm: 220, md: 690 },
+            height: 'auto',
+            opacity: 0.05,
+            pointerEvents: 'none',
+            userSelect: 'none',
+            zIndex: 0,
+            // filter: 'grayscale(100%)',
+          }}
+        />
+
+        <Scrollbar ref={messagesEndRef} sx={{ px: 3, pt: 5, pb: 3, height: '100%', position: 'relative', zIndex: 1 }}>
+          {messages.map((message) => (
+            <ChatMessageItem
+              key={message.id}
+              message={message}
+              participants={participants}
+              onOpenLightbox={() => lightbox.onOpen(message.body)}
+            />
+          ))}
+        </Scrollbar>
+      </Box>
 
       <Lightbox
         slides={slides}

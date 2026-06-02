@@ -133,6 +133,8 @@ export const endpoints = {
     update: '/api/v1/users/update',
     search: '/api/v1/users/search',
     getAll: '/api/v1/users/get',
+    block: '/api/v1/users/block',
+    unblock: '/api/v1/users/unblock',
   },
   calls: {
     webhook: '/api/v1/calls/webhook',

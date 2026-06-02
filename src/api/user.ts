@@ -57,3 +57,33 @@ export async function getAllUsers(): Promise<UserData[]> {
     throw error;
   }
 }
+
+// ----------------------------------------------------------------------
+
+/**
+ * Block a user
+ * POST /api/v1/users/block
+ */
+export async function blockUser(targetUserId: string): Promise<void> {
+  try {
+    await axios.post(endpoints.user.block, { targetUserId });
+  } catch (error) {
+    console.error('[API] blockUser error:', error);
+    throw error;
+  }
+}
+
+// ----------------------------------------------------------------------
+
+/**
+ * Unblock a user
+ * POST /api/v1/users/unblock
+ */
+export async function unblockUser(targetUserId: string): Promise<void> {
+  try {
+    await axios.post(endpoints.user.unblock, { targetUserId });
+  } catch (error) {
+    console.error('[API] unblockUser error:', error);
+    throw error;
+  }
+}

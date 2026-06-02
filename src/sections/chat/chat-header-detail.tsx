@@ -1,6 +1,6 @@
 import type { IChatParticipant } from 'src/types/chat';
 
-import { useCallback } from 'react';
+import { useState, useCallback } from 'react';
 
 import Stack from '@mui/material/Stack';
 import Badge from '@mui/material/Badge';
@@ -22,6 +22,8 @@ import { fToNow } from 'src/utils/format-time';
 
 import { useCall } from 'src/call';
 import { useSocket } from 'src/socket';
+import { useAuthStore } from 'src/store/useAuthStore';
+import { blockUser, unblockUser } from 'src/api/user';
 
 import { Iconify } from 'src/components/iconify';
 import { usePopover, CustomPopover } from 'src/components/custom-popover';
@@ -56,6 +58,9 @@ export function ChatHeaderDetail({
   const conversationId = searchParams.get('id') || '';
   const { recordingUsers, typingUsers, onlineUsers } = useSocket();
 
+  const { user: currentUser, toggleBlockUser } = useAuthStore();
+  const [blockLoading, setBlockLoading] = useState(false);
+
   const lgUp = useResponsive('up', 'lg');
 
   const { collapseDesktop, onCollapseDesktop, onOpenMobile } = collapseNav;
@@ -73,7 +78,9 @@ export function ChatHeaderDetail({
   const group = participants.length > 1;
 
   const singleParticipant = participants[0];
-  
+
+  const isBlocked = currentUser?.blockedUsers?.includes(singleParticipant?.id) ?? false;
+
   const isRecording = (recordingUsers[conversationId] || []).includes(singleParticipant?.id);
   const isTyping = (typingUsers[conversationId] || []).includes(singleParticipant?.id);
   const isRealtimeOnline = onlineUsers.has(singleParticipant?.id);
@@ -94,6 +101,24 @@ export function ChatHeaderDetail({
     if (!participantIds.length) return;
     startCall(participantIds, 'video');
   }, [participantIds, startCall]);
+
+  const handleToggleBlock = useCallback(async () => {
+    if (!singleParticipant?.id || blockLoading) return;
+    setBlockLoading(true);
+    try {
+      if (isBlocked) {
+        await unblockUser(singleParticipant.id);
+      } else {
+        await blockUser(singleParticipant.id);
+      }
+      toggleBlockUser(singleParticipant.id, !isBlocked);
+    } catch (err) {
+      console.error('[Block] toggle failed:', err);
+    } finally {
+      setBlockLoading(false);
+      popover.onClose();
+    }
+  }, [singleParticipant?.id, isBlocked, blockLoading, toggleBlockUser, popover]);
 
   const renderGroup = (
     <AvatarGroup max={3} sx={{ [`& .${avatarGroupClasses.avatar}`]: { width: 32, height: 32 } }}>
@@ -201,12 +226,12 @@ export function ChatHeaderDetail({
           </MenuItem>
 
           <MenuItem
-            onClick={() => {
-              popover.onClose();
-            }}
+            onClick={handleToggleBlock}
+            disabled={blockLoading || group}
+            sx={isBlocked ? { color: 'warning.main' } : {}}
           >
-            <Iconify icon="solar:forbidden-circle-bold" />
-            Block
+            <Iconify icon={isBlocked ? 'solar:forbidden-circle-bold' : 'solar:forbidden-circle-bold'} />
+            {blockLoading ? (isBlocked ? 'Unblocking...' : 'Blocking...') : isBlocked ? 'Unblock' : 'Block'}
           </MenuItem>
 
           <MenuItem

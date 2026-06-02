@@ -76,9 +76,10 @@ export function ChatMessageInput({
 }: Props) {
   const router = useRouter();
 
-  const { startTyping, startRecording, stopRecording } = useSocket();
+  const { startTyping, stopTyping, startRecording, stopRecording } = useSocket();
 
   const lastTypingTimeRef = useRef<number>(0);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { user } = useMockedUser();
 
@@ -281,12 +282,23 @@ export function ChatMessageInput({
 
     if (selectedConversationId) {
       const now = Date.now();
+      // Typing shuru — agar 3s se nahi bheja to dobara true bhejo
       if (now - lastTypingTimeRef.current > 3000) {
         startTyping({ conversationId: selectedConversationId });
         lastTypingTimeRef.current = now;
       }
+
+      // Pichla timeout clear karo
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+
+      // 2s ke baad typing: false bhejo
+      typingTimeoutRef.current = setTimeout(() => {
+        stopTyping({ conversationId: selectedConversationId });
+        lastTypingTimeRef.current = 0;
+        typingTimeoutRef.current = null;
+      }, 2000);
     }
-  }, [selectedConversationId, startTyping]);
+  }, [selectedConversationId, startTyping, stopTyping]);
 
   const onSubmitMessage = useCallback(async () => {
     try {

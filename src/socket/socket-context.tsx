@@ -326,12 +326,12 @@ export function SocketProvider({ children }: SocketProviderProps) {
     socketInstance.on(
       'user_typing',
       (payload: { conversationId: string; userId: string; typing?: boolean }) => {
-        const { conversationId, userId } = payload;
+        const { conversationId, userId, typing } = payload;
         if (userId === currentUserId) return;
 
         const key = `${conversationId}-${userId}`;
 
-        // Resolve name from store for zustand update
+        // Resolve name from store
         const {conversations} = useChatStore.getState();
         let typingName = 'Someone';
         let targetConvId = conversationId;
@@ -361,16 +361,29 @@ export function SocketProvider({ children }: SocketProviderProps) {
           }
         }
 
-        // Update zustand chat store
-        useChatStore.getState().setTypingUser(targetConvId, typingName, true);
+        // typing: false aaya — turant clear karo, timeout ka wait mat karo
+        if (typing === false) {
+          if (typingTimeouts[key]) {
+            clearTimeout(typingTimeouts[key]);
+            delete typingTimeouts[key];
+          }
+          useChatStore.getState().setTypingUser(targetConvId, typingName, false);
+          setTypingUsers((prev) => {
+            const list = prev[conversationId] || [];
+            return { ...prev, [conversationId]: list.filter((id) => id !== userId) };
+          });
+          return;
+        }
 
-        // Update local React state for fast UI
+        // typing: true — user ko list mein add karo
+        useChatStore.getState().setTypingUser(targetConvId, typingName, true);
         setTypingUsers((prev) => {
           const list = prev[conversationId] || [];
           if (list.includes(userId)) return prev;
           return { ...prev, [conversationId]: [...list, userId] };
         });
 
+        // Fallback: agar false kabhi na aaye to 4s baad auto-clear
         if (typingTimeouts[key]) clearTimeout(typingTimeouts[key]);
         typingTimeouts[key] = setTimeout(() => {
           useChatStore.getState().setTypingUser(targetConvId, typingName, false);

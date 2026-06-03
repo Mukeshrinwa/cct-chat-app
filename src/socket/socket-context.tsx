@@ -1,8 +1,8 @@
 // @refresh reset
 import type { Socket } from 'socket.io-client';
 
-import { mutate } from 'swr';
 import { toast } from 'sonner';
+import { mutate, useSWRConfig } from 'swr';
 import React, { useMemo, useState, useEffect, useContext, createContext } from 'react';
 
 import { normalizeMessage } from 'src/utils/chat-utils';
@@ -58,6 +58,7 @@ type SocketProviderProps = {
 
 export function SocketProvider({ children }: SocketProviderProps) {
   const { user } = useAuthContext();
+  const { cache } = useSWRConfig();
 
   const [isConnected, setIsConnected] = useState(false);
   const [typingUsers, setTypingUsers] = useState<Record<string, string[]>>({});
@@ -240,28 +241,10 @@ export function SocketProvider({ children }: SocketProviderProps) {
 
       if (conversationId) {
         // Mutate conversation messages cache
-        mutate(
-          `/api/v1/chats/conversations/${conversationId}`,
-          (current: any) => {
-            if (!current || !current.conversation) return current;
-            const exists = current.conversation.messages.some(
-              (m: any) => m.id === parsedMessage.id
-            );
-            if (exists) return current;
-            return {
-              ...current,
-              conversation: {
-                ...current.conversation,
-                messages: [...current.conversation.messages, parsedMessage],
-              },
-            };
-          },
-          { revalidate: false }
-        );
-
-        if (senderId && senderId !== currentUserId) {
+        const convCacheKey = `/api/v1/chats/conversations/${conversationId}`;
+        if (cache.get(convCacheKey)?.data !== undefined) {
           mutate(
-            `/api/v1/chats/conversations/${senderId}`,
+            convCacheKey,
             (current: any) => {
               if (!current || !current.conversation) return current;
               const exists = current.conversation.messages.some(
@@ -278,6 +261,30 @@ export function SocketProvider({ children }: SocketProviderProps) {
             },
             { revalidate: false }
           );
+        }
+
+        if (senderId && senderId !== currentUserId) {
+          const senderCacheKey = `/api/v1/chats/conversations/${senderId}`;
+          if (cache.get(senderCacheKey)?.data !== undefined) {
+            mutate(
+              senderCacheKey,
+              (current: any) => {
+                if (!current || !current.conversation) return current;
+                const exists = current.conversation.messages.some(
+                  (m: any) => m.id === parsedMessage.id
+                );
+                if (exists) return current;
+                return {
+                  ...current,
+                  conversation: {
+                    ...current.conversation,
+                    messages: [...current.conversation.messages, parsedMessage],
+                  },
+                };
+              },
+              { revalidate: false }
+            );
+          }
         }
 
         // Mutate conversation list
@@ -322,7 +329,10 @@ export function SocketProvider({ children }: SocketProviderProps) {
     socketInstance.on(
       'message_delivered',
       (payload: { messageId: string; conversationId: string; userId: string }) => {
-        mutate(`/api/v1/chats/conversations/${payload.conversationId}`);
+        const key = `/api/v1/chats/conversations/${payload.conversationId}`;
+        if (cache.get(key)?.data !== undefined) {
+          mutate(key);
+        }
       }
     );
 
@@ -497,7 +507,10 @@ export function SocketProvider({ children }: SocketProviderProps) {
     socketInstance.on(
       'disappearing_mode_update',
       (payload: { conversationId: string; mode: string; updatedBy: string }) => {
-        mutate(`/api/v1/chats/conversations/${payload.conversationId}`);
+        const key = `/api/v1/chats/conversations/${payload.conversationId}`;
+        if (cache.get(key)?.data !== undefined) {
+          mutate(key);
+        }
         useChatStore
           .getState()
           .updateConversationDisappearingMode(payload.conversationId, payload.mode);
@@ -512,7 +525,10 @@ export function SocketProvider({ children }: SocketProviderProps) {
       mutate('/api/v1/chats/conversations');
       const convId = payload?.message?.conversationId || useChatStore.getState().activeConversationId;
       if (convId) {
-        mutate(`/api/v1/chats/conversations/${convId}`);
+        const key = `/api/v1/chats/conversations/${convId}`;
+        if (cache.get(key)?.data !== undefined) {
+          mutate(key);
+        }
       }
     });
 
@@ -532,24 +548,27 @@ export function SocketProvider({ children }: SocketProviderProps) {
         if (!convId) return;
 
         // Patch reactions in SWR cache without a network refetch
-        mutate(
-          `/api/v1/chats/conversations/${convId}`,
-          (current: any) => {
-            if (!current?.conversation?.messages) return current;
-            return {
-              ...current,
-              conversation: {
-                ...current.conversation,
-                messages: current.conversation.messages.map((m: any) =>
-                  m.id === payload.messageId
-                    ? { ...m, reactions: payload.reactions }
-                    : m
-                ),
-              },
-            };
-          },
-          { revalidate: false }
-        );
+        const key = `/api/v1/chats/conversations/${convId}`;
+        if (cache.get(key)?.data !== undefined) {
+          mutate(
+            key,
+            (current: any) => {
+              if (!current?.conversation?.messages) return current;
+              return {
+                ...current,
+                conversation: {
+                  ...current.conversation,
+                  messages: current.conversation.messages.map((m: any) =>
+                    m.id === payload.messageId
+                      ? { ...m, reactions: payload.reactions }
+                      : m
+                  ),
+                },
+              };
+            },
+            { revalidate: false }
+          );
+        }
       }
     );
 
@@ -578,25 +597,28 @@ export function SocketProvider({ children }: SocketProviderProps) {
         );
 
         // 2. Mark messages as read in the conversation cache
-        mutate(
-          `/api/v1/chats/conversations/${conversationId}`,
-          (current: any) => {
-            if (!current || !current.conversation) return current;
-            return {
-              ...current,
-              conversation: {
-                ...current.conversation,
-                messages: current.conversation.messages.map((m: any) => {
-                  if (m.senderId !== readBy) {
-                    return { ...m, status: 'read' };
-                  }
-                  return m;
-                }),
-              },
-            };
-          },
-          { revalidate: false }
-        );
+        const key = `/api/v1/chats/conversations/${conversationId}`;
+        if (cache.get(key)?.data !== undefined) {
+          mutate(
+            key,
+            (current: any) => {
+              if (!current || !current.conversation) return current;
+              return {
+                ...current,
+                conversation: {
+                  ...current.conversation,
+                  messages: current.conversation.messages.map((m: any) => {
+                    if (m.senderId !== readBy) {
+                      return { ...m, status: 'read' };
+                    }
+                    return m;
+                  }),
+                },
+              };
+            },
+            { revalidate: false }
+          );
+        }
       }
     );
 
@@ -625,7 +647,7 @@ export function SocketProvider({ children }: SocketProviderProps) {
       socketInstance.off('messages_read');
       Object.values(typingTimeouts).forEach(clearTimeout);
     };
-  }, [token, currentUserId]);
+  }, [token, currentUserId, cache]);
 
   // -----------------------------------------------------------------------
   // Emitters

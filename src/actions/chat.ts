@@ -220,6 +220,7 @@ type ConversationData = {
 };
 
 async function fetchConversationDetail(conversationId: string, currentUser: any) {
+  console.log('[DEBUG] fetchConversationDetail started with ID:', conversationId);
   let realConvId = conversationId;
   let otherUser: any = null;
   let conversationData: any = null;
@@ -270,11 +271,13 @@ async function fetchConversationDetail(conversationId: string, currentUser: any)
     }
   }
 
+  console.log('[DEBUG] After step 1, conversationData:', conversationData);
   // 2. Fetch messages
   let messages: any[] = [];
   try {
     const msgRes = await axios.get(`/api/v1/chats/messages/${realConvId}`);
     messages = msgRes.data?.data || [];
+    console.log('[DEBUG] Fetched messages:', messages);
   } catch (e) {
     console.error('Failed to fetch messages:', e);
   }
@@ -434,7 +437,7 @@ async function fetchConversationDetail(conversationId: string, currentUser: any)
     }
   }
 
-  return {
+  const result = {
     conversation: {
       id: realConvId,
       type: conversationData?.type || (participants.length > 1 ? 'group' : 'direct'),
@@ -443,6 +446,8 @@ async function fetchConversationDetail(conversationId: string, currentUser: any)
       participants,
     },
   };
+  console.log('[DEBUG] fetchConversationDetail completed with ID:', conversationId, 'returning:', result);
+  return result;
 }
 
 export function useGetConversation(conversationId: string) {
@@ -457,6 +462,8 @@ export function useGetConversation(conversationId: string) {
     () => fetchConversationDetail(conversationId, user),
     swrOptions
   );
+
+  console.log('[DEBUG] useGetConversation SWR state for ID:', conversationId, { data, isLoading, error, isValidating });
 
   const memoizedValue = useMemo(
     () => ({

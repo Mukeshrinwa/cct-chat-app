@@ -79,6 +79,11 @@ export function ChatNav({
     conversations.allIds.forEach((convId) => {
       const conv = conversations.byId[convId];
       if (!conv) return;
+      
+      // Exclude group conversations so we only show users we have chatted with directly
+      const isGroup = conv.type === 'GROUP' || conv.type === 'group';
+      if (isGroup) return;
+
       conv.participants.forEach((p) => {
         if (p.id === user?.id) return;
         if (seen.has(p.id)) return;

@@ -18,7 +18,9 @@ import { useResponsive } from 'src/hooks/use-responsive';
 
 import { fToNow } from 'src/utils/format-time';
 
+import { useGetGroups } from 'src/actions/group';
 import { clickConversation } from 'src/actions/chat';
+import { useGroupStore } from 'src/store/useGroupStore';
 
 import { useMockedUser } from 'src/auth/hooks';
 
@@ -42,6 +44,21 @@ export function ChatNavItem({ selected, collapse, conversation, onCloseMobile }:
 
   const { group, displayName, displayText, participants, lastActivity, hasOnlineInGroup } =
     useNavItem({ conversation, currentUserId: `${user?.id}` });
+
+  const { groups } = useGetGroups();
+  const groupStoreGroups = useGroupStore((state) => state.groups);
+
+  const currentGroupFromList = groups.find(
+    (g: any) =>
+      g.conversationId?._id === conversation.id ||
+      g.conversationId === conversation.id
+  );
+
+  const currentGroupFromStore = groupStoreGroups[conversation.id];
+
+  const currentGroup = currentGroupFromList || currentGroupFromStore || null;
+
+  const isGroup = conversation.type === 'GROUP' || conversation.type === 'group' || group || currentGroup !== null;
 
   const singleParticipant = participants[0];
 
@@ -68,11 +85,15 @@ export function ChatNavItem({ selected, collapse, conversation, onCloseMobile }:
       variant={hasOnlineInGroup ? 'online' : 'invisible'}
       anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
     >
-      <AvatarGroup variant="compact" sx={{ width: 48, height: 48 }}>
-        {participants.slice(0, 2).map((participant) => (
-          <Avatar key={participant.id} alt={participant.name} src={participant.avatarUrl} />
-        ))}
-      </AvatarGroup>
+      {currentGroup?.groupAvatar ? (
+        <Avatar alt={currentGroup.groupName || 'Group'} src={currentGroup.groupAvatar} sx={{ width: 48, height: 48 }} />
+      ) : (
+        <AvatarGroup variant="compact" sx={{ width: 48, height: 48 }}>
+          {participants.slice(0, 2).map((participant) => (
+            <Avatar key={participant.id} alt={participant.name} src={participant.avatarUrl} />
+          ))}
+        </AvatarGroup>
+      )}
     </Badge>
   );
 
@@ -98,13 +119,13 @@ export function ChatNavItem({ selected, collapse, conversation, onCloseMobile }:
           overlap="circular"
           badgeContent={collapse ? conversation.unreadCount : 0}
         >
-          {group ? renderGroup : renderSingle}
+          {isGroup ? renderGroup : renderSingle}
         </Badge>
 
         {!collapse && (
           <>
             <ListItemText
-              primary={displayName}
+              primary={currentGroup?.groupName || displayName}
               primaryTypographyProps={{ noWrap: true, component: 'span', variant: 'subtitle2' }}
               secondary={displayText}
               secondaryTypographyProps={{

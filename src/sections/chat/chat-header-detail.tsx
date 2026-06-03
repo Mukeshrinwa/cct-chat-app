@@ -22,8 +22,10 @@ import { fToNow } from 'src/utils/format-time';
 
 import { useCall } from 'src/call';
 import { useSocket } from 'src/socket';
+import { useGetGroups } from 'src/actions/group';
 import { useAuthStore } from 'src/store/useAuthStore';
 import { blockUser, unblockUser } from 'src/api/user';
+import { useGroupStore } from 'src/store/useGroupStore';
 
 import { Iconify } from 'src/components/iconify';
 import { usePopover, CustomPopover } from 'src/components/custom-popover';
@@ -74,8 +76,20 @@ export function ChatHeaderDetail({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lgUp]);
 
+  const { groups } = useGetGroups();
+  const groupStoreGroups = useGroupStore((state) => state.groups);
 
-  const group = participants.length > 1;
+  const currentGroupFromList = groups.find(
+    (g: any) =>
+      g.conversationId?._id === conversationId ||
+      g.conversationId === conversationId
+  );
+
+  const currentGroupFromStore = groupStoreGroups[conversationId];
+
+  const currentGroup = currentGroupFromList || currentGroupFromStore || null;
+
+  const group = currentGroup !== null || participants.length > 1;
 
   const singleParticipant = participants[0];
 
@@ -121,11 +135,30 @@ export function ChatHeaderDetail({
   }, [singleParticipant?.id, isBlocked, blockLoading, toggleBlockUser, popover]);
 
   const renderGroup = (
-    <AvatarGroup max={3} sx={{ [`& .${avatarGroupClasses.avatar}`]: { width: 32, height: 32 } }}>
-      {participants.map((participant) => (
-        <Avatar key={participant.id} alt={participant.name} src={participant.avatarUrl} />
-      ))}
-    </AvatarGroup>
+    <Stack direction="row" alignItems="center" spacing={2}>
+      {currentGroup?.groupAvatar ? (
+        <Avatar
+          src={currentGroup.groupAvatar}
+          alt={currentGroup.groupName || 'Group'}
+          sx={{ width: 40, height: 40 }}
+        />
+      ) : (
+        <AvatarGroup max={3} sx={{ [`& .${avatarGroupClasses.avatar}`]: { width: 32, height: 32 } }}>
+          {participants.map((participant) => (
+            <Avatar key={participant.id} alt={participant.name} src={participant.avatarUrl} />
+          ))}
+        </AvatarGroup>
+      )}
+
+      <ListItemText
+        primary={currentGroup?.groupName || 'Group Chat'}
+        secondary={`${participants.length + (isUserMember ? 1 : 0)} members`}
+        secondaryTypographyProps={{
+          component: 'span',
+          color: 'text.secondary',
+        }}
+      />
+    </Stack>
   );
 
   const renderSingle = (

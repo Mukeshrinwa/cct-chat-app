@@ -134,13 +134,14 @@ export function ChatView() {
   }, [conversation?.messages, searchMessageQuery]);
 
   return (
-    <Box sx={{ display: 'flex', flex: '1 1 auto', flexDirection: 'column', height: '100vh' }}>
+    <Box sx={{ display: 'flex', flex: '1 1 auto', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
       <Layout
         sx={{
           minHeight: 0,
           flex: '1 1 0',
           position: 'relative',
           bgcolor: 'background.paper',
+          overflow: 'hidden',
         }}
         slots={{
           header: selectedConversationId ? (

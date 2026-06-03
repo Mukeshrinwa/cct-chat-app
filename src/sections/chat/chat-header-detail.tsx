@@ -188,6 +188,7 @@ export function ChatHeaderDetail({
           }}
           sx={{
             mr: 2,
+            display: { xs: 'none', sm: 'inline-flex' },
             width: { xs: 120, sm: 180, md: 220 },
             '& .MuiOutlinedInput-root': {
               borderRadius: 1.5,
@@ -205,7 +206,7 @@ export function ChatHeaderDetail({
           <Iconify icon="solar:videocamera-record-bold" />
         </IconButton>
 
-        <IconButton onClick={handleToggleNav}>
+        <IconButton onClick={handleToggleNav} sx={{ display: { xs: 'none', md: 'inline-flex' } }}>
           <Iconify icon={!collapseDesktop ? 'ri:sidebar-unfold-fill' : 'ri:sidebar-fold-fill'} />
         </IconButton>
 

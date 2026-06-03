@@ -1,8 +1,12 @@
 import type { IChatMessage, IChatParticipant } from 'src/types/chat';
 
+import { useMemo } from 'react';
+
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import LinearProgress from '@mui/material/LinearProgress';
+
+import { getMediaUrl } from 'src/utils/chat-utils';
 
 import { Scrollbar } from 'src/components/scrollbar';
 import { Lightbox, useLightBox } from 'src/components/lightbox';
@@ -18,12 +22,38 @@ type Props = {
   participants: IChatParticipant[];
 };
 
+function getMessageImageUrl(message: IChatMessage): string | null {
+  const firstAttachment = message.attachments?.[0];
+  const firstAttachmentUrl = firstAttachment?.url || firstAttachment?.preview || firstAttachment?.path || '';
+  const firstAttachmentType = firstAttachment?.type || '';
+
+  const hasImage =
+    message.contentType === 'image' ||
+    firstAttachmentType.startsWith('image/') ||
+    (typeof firstAttachmentUrl === 'string' &&
+      (/\.(jpeg|jpg|gif|png|webp)($|\?)/i.test(firstAttachmentUrl) || firstAttachmentUrl.includes('giphy.com'))) ||
+    (typeof message.body === 'string' &&
+      (message.body.startsWith('data:image/') ||
+        /\.(jpeg|jpg|gif|png|webp)($|\?)/i.test(message.body) || message.body.includes('giphy.com')));
+
+  if (!hasImage) return null;
+
+  return firstAttachmentUrl || getMediaUrl(message.body);
+}
+
 export function ChatMessageList({ messages = [], participants, loading }: Props) {
   const { messagesEndRef } = useMessagesScroll(messages);
 
-  const slides = messages
-    .filter((message) => message.contentType === 'image')
-    .map((message) => ({ src: message.body }));
+  const slides = useMemo(() => {
+    const list: { src: string }[] = [];
+    messages.forEach((message) => {
+      const imgUrl = getMessageImageUrl(message);
+      if (imgUrl) {
+        list.push({ src: imgUrl });
+      }
+    });
+    return list;
+  }, [messages]);
 
   const lightbox = useLightBox(slides);
 
@@ -75,7 +105,7 @@ export function ChatMessageList({ messages = [], participants, loading }: Props)
               key={message.id}
               message={message}
               participants={participants}
-              onOpenLightbox={() => lightbox.onOpen(message.body)}
+              onOpenLightbox={(url) => lightbox.onOpen(url)}
             />
           ))}
         </Scrollbar>

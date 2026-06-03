@@ -18,12 +18,14 @@ import DialogActions from '@mui/material/DialogActions';
 import { useSearchParams } from 'src/routes/hooks';
 
 import { fToNow } from 'src/utils/format-time';
+import { fData } from 'src/utils/format-number';
 import { getMediaUrl } from 'src/utils/chat-utils';
 
 import { editMessage, deleteMessage, reactToMessage } from 'src/actions/chat';
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
+import { FileThumbnail } from 'src/components/file-thumbnail';
 
 import { useMockedUser } from 'src/auth/hooks';
 
@@ -260,7 +262,8 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
           src={imageUrl}
           onClick={() => onOpenLightbox(imageUrl)}
           sx={{
-            width: 400,
+            width: 1,
+            maxWidth: { xs: 240, sm: 320, md: 400 },
             height: 'auto',
             borderRadius: 1.5,
             cursor: 'pointer',
@@ -274,6 +277,44 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
           {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
           <audio controls src={audioUrl} style={{ width: '100%', height: 40, outline: 'none' }} />
         </Box>
+      ) : message.attachments && message.attachments.length > 0 ? (
+        <Stack spacing={1} sx={{ width: 220, p: 0.5 }}>
+          {message.attachments.map((att, idx) => (
+              <Stack
+                key={att.name + idx}
+                spacing={1.5}
+                direction="row"
+                alignItems="center"
+                onClick={() => window.open(att.preview || att.path, '_blank')}
+                sx={{
+                  p: 1,
+                  borderRadius: 1,
+                  cursor: 'pointer',
+                  bgcolor: me ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.03)',
+                  '&:hover': {
+                    bgcolor: me ? 'rgba(255, 255, 255, 0.16)' : 'rgba(0, 0, 0, 0.06)',
+                  },
+                }}
+              >
+                <FileThumbnail
+                  file={att.name}
+                  slotProps={{ icon: { width: 24, height: 24 } }}
+                  sx={{ width: 40, height: 40 }}
+                />
+                
+                <Stack spacing={0.25} sx={{ minWidth: 0, flexGrow: 1 }}>
+                  <Typography variant="subtitle2" noWrap sx={{ fontSize: '13px', color: me ? 'inherit' : 'text.primary' }}>
+                    {att.name}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: me ? 'rgba(255, 255, 255, 0.7)' : 'text.secondary', fontSize: '11px' }}>
+                    {fData(att.size)}
+                  </Typography>
+                </Stack>
+                
+                <Iconify icon="solar:download-minimalistic-bold" width={20} sx={{ color: me ? 'inherit' : 'text.secondary' }} />
+              </Stack>
+            ))}
+        </Stack>
       ) : (
         body
       )}
@@ -287,6 +328,7 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
       sx={{
         top: '50%',
         opacity: 0,
+        display: { xs: 'none', md: 'flex' },
         position: 'absolute',
         transform: 'translateY(-50%)',
         transition: (theme) =>

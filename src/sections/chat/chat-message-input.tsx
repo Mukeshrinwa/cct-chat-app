@@ -100,6 +100,8 @@ export function ChatMessageInput({
 
   const fileRef = useRef<HTMLInputElement>(null);
 
+  const docRef = useRef<HTMLInputElement>(null);
+
   const [message, setMessage] = useState('');
 
   const inputRef = useRef<HTMLInputElement>(null);
@@ -256,6 +258,29 @@ export function ChatMessageInput({
     }
   }, [selectedConversationId]);
 
+  const handleDocChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !selectedConversationId) return;
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('conversationId', selectedConversationId);
+      formData.append('messageId', uuidv4());
+
+      await axios.post('/api/v1/files/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      console.log('[FILE_UPLOAD] File uploaded via FormData');
+    } catch (error) {
+      console.error('Failed to send file:', error);
+    }
+
+    if (docRef.current) {
+      docRef.current.value = '';
+    }
+  }, [selectedConversationId]);
+
 
 
 
@@ -285,6 +310,12 @@ export function ChatMessageInput({
   const handleAttach = useCallback(() => {
     if (fileRef.current) {
       fileRef.current.click();
+    }
+  }, []);
+
+  const handleAttachDoc = useCallback(() => {
+    if (docRef.current) {
+      docRef.current.click();
     }
   }, []);
 
@@ -541,7 +572,7 @@ export function ChatMessageInput({
               <IconButton onClick={handleAttach} disabled={!isUserMember}>
                 <Iconify icon="solar:gallery-add-bold" />
               </IconButton>
-              <IconButton onClick={handleAttach} disabled={!isUserMember}>
+              <IconButton onClick={handleAttachDoc} disabled={!isUserMember}>
                 <Iconify icon="eva:attach-2-fill" />
               </IconButton>
               <IconButton
@@ -568,6 +599,10 @@ export function ChatMessageInput({
             height: 56,
             flexShrink: 0,
             borderTop: (theme) => `solid 1px ${theme.vars.palette.divider}`,
+            width: '100%',
+            '& .MuiInputBase-input': {
+              minWidth: 0,
+            },
           }}
         />
       )}
@@ -577,7 +612,15 @@ export function ChatMessageInput({
         ref={fileRef}
         onChange={handleFileChange}
         style={{ display: 'none' }}
-        accept="image/*"
+        accept="image/*,video/*"
+      />
+
+      <input
+        type="file"
+        ref={docRef}
+        onChange={handleDocChange}
+        style={{ display: 'none' }}
+        accept="*/*"
       />
 
       <Popover

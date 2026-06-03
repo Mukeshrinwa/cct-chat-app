@@ -1,5 +1,6 @@
-import type { IChatParticipant, IChatConversations } from 'src/types/chat';
+import type { IChatMessage, IChatParticipant, IChatConversations } from 'src/types/chat';
 
+import { mutate } from 'swr';
 import { useMemo, useState, useEffect, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
@@ -15,6 +16,8 @@ import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
 
 import { useResponsive } from 'src/hooks/use-responsive';
+
+import { globalSearch, getMessageContext } from 'src/actions/chat';
 
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
@@ -96,8 +99,10 @@ export function ChatNav({
 
   const [searchContacts, setSearchContacts] = useState<{
     query: string;
-    results: IChatParticipant[];
-  }>({ query: '', results: [] });
+    users: IChatParticipant[];
+    messages: IChatMessage[];
+    loading: boolean;
+  }>({ query: '', users: [], messages: [], loading: false });
 
   useEffect(() => {
     if (!mdUp) {
@@ -120,42 +125,34 @@ export function ChatNav({
     router.push(paths.dashboard.chat);
   }, [mdUp, onCloseMobile, router]);
 
-  // Search only within users who are already in our conversations
-  const handleSearchContacts = useCallback((inputValue: string) => {
-    setSearchContacts((prevState) => ({ ...prevState, query: inputValue }));
+  // Search using globalSearch API
+  const handleSearchContacts = useCallback(async (inputValue: string) => {
+    setSearchContacts((prevState) => ({ ...prevState, query: inputValue, loading: !!inputValue }));
 
     if (!inputValue) {
-      setSearchContacts({ query: '', results: [] });
+      setSearchContacts({ query: '', users: [], messages: [], loading: false });
       return;
     }
 
-    const queryLower = inputValue.toLowerCase();
-    const results: IChatParticipant[] = [];
-    const seenIds = new Set<string>();
-
-    conversations.allIds.forEach((convId) => {
-      const conv = conversations.byId[convId];
-      if (conv && conv.participants) {
-        conv.participants.forEach((p) => {
-          if (p.id === user?.id) return; // exclude current user
-          if (seenIds.has(p.id)) return;
-
-          const nameMatch = p.name?.toLowerCase().includes(queryLower);
-          const usernameMatch = p.username?.toLowerCase().includes(queryLower);
-
-          if (nameMatch || usernameMatch) {
-            seenIds.add(p.id);
-            results.push(p);
-          }
-        });
-      }
-    });
-
-    setSearchContacts((prevState) => ({ ...prevState, results }));
-  }, [conversations, user]);
+    try {
+      const { users, messages } = await globalSearch(inputValue);
+      setSearchContacts((prevState) => {
+        if (prevState.query !== inputValue) return prevState;
+        return {
+          query: inputValue,
+          users,
+          messages,
+          loading: false,
+        };
+      });
+    } catch (err) {
+      console.error('Failed to search globally:', err);
+      setSearchContacts((prevState) => (prevState.query === inputValue ? { ...prevState, loading: false } : prevState));
+    }
+  }, []);
 
   const handleClickAwaySearch = useCallback(() => {
-    setSearchContacts({ query: '', results: [] });
+    setSearchContacts({ query: '', users: [], messages: [], loading: false });
   }, []);
 
   const handleClickResult = useCallback(
@@ -165,23 +162,57 @@ export function ChatNav({
       // Check if we already have a direct conversation with this user
       const existingConv = conversations.allIds.find((convId) => {
         const conv = conversations.byId[convId];
-        if (!conv || conv.type === 'GROUP') return false;
+        if (!conv || conv.type === 'GROUP' || conv.type === 'group') return false;
         return conv.participants.some((p) => p.id === result.id);
       });
 
       if (existingConv) {
         // Navigate to the existing conversation
         router.push(`${paths.dashboard.chat}?id=${existingConv}`);
-      } else if (onSelectContact) {
-        // New conversation: set as recipient via compose header
-        router.push(paths.dashboard.chat);
-        onSelectContact(result);
       } else {
-        // Fallback: navigate with user ID (backend will handle)
+        // Navigate to the conversation (backend will resolve recipient ID check)
         router.push(`${paths.dashboard.chat}?id=${result.id}`);
       }
     },
-    [handleClickAwaySearch, router, conversations, onSelectContact]
+    [handleClickAwaySearch, router, conversations]
+  );
+
+  const handleClickMessage = useCallback(
+    async (message: IChatMessage) => {
+      handleClickAwaySearch();
+
+      const msgAny = message as any;
+      const convId = typeof msgAny.conversationId === 'object'
+        ? (msgAny.conversationId._id || msgAny.conversationId.id)
+        : msgAny.conversationId;
+
+      if (!convId) return;
+
+      router.push(`${paths.dashboard.chat}?id=${convId}&messageId=${message.id}`);
+
+      try {
+        const contextMessages = await getMessageContext(convId, message.id);
+        if (contextMessages && contextMessages.length > 0) {
+          mutate(
+            `/api/v1/chats/conversations/${convId}`,
+            (currentData: any) => {
+              if (!currentData) return currentData;
+              return {
+                ...currentData,
+                conversation: {
+                  ...currentData.conversation,
+                  messages: contextMessages,
+                },
+              };
+            },
+            { revalidate: false }
+          );
+        }
+      } catch (err) {
+        console.error('Failed to load message context:', err);
+      }
+    },
+    [handleClickAwaySearch, router]
   );
 
   const renderLoading = <ChatNavItemSkeleton />;
@@ -205,68 +236,71 @@ export function ChatNav({
   const renderListResults = (
     <ChatNavSearchResults
       query={searchContacts.query}
-      results={searchContacts.results}
-      onClickResult={handleClickResult}
+      users={searchContacts.users}
+      messages={searchContacts.messages}
+      loading={searchContacts.loading}
+      onClickUser={handleClickResult}
+      onClickMessage={handleClickMessage}
     />
   );
 
   const renderSearchInput = (
-    <ClickAwayListener onClickAway={handleClickAwaySearch}>
-      <TextField
-        fullWidth
-        value={searchContacts.query}
-        onChange={(event) => handleSearchContacts(event.target.value)}
-        placeholder="Search by username..."
-        InputProps={{
-          startAdornment: (
-            <InputAdornment position="start">
-              <Iconify icon="eva:search-fill" sx={{ color: 'text.disabled' }} />
-            </InputAdornment>
-          ),
-        }}
-        sx={{ mt: 2.5 }}
-      />
-    </ClickAwayListener>
+    <TextField
+      fullWidth
+      value={searchContacts.query}
+      onChange={(event) => handleSearchContacts(event.target.value)}
+      placeholder="Search by username..."
+      InputProps={{
+        startAdornment: (
+          <InputAdornment position="start">
+            <Iconify icon="eva:search-fill" sx={{ color: 'text.disabled' }} />
+          </InputAdornment>
+        ),
+      }}
+      sx={{ mt: 2.5 }}
+    />
   );
 
   const renderContent = (
-    <>
-      <Stack direction="row" alignItems="center" justifyContent="center" sx={{ p: 2.5, pb: 0 }}>
-        {!collapseDesktop && (
-          <>
-            <ChatNavAccount />
-            <Box sx={{ flexGrow: 1 }} />
-          </>
-        )}
+    <ClickAwayListener onClickAway={handleClickAwaySearch}>
+      <Stack sx={{ height: 1, minHeight: 0 }}>
+        <Stack direction="row" alignItems="center" justifyContent="center" sx={{ p: 2.5, pb: 0 }}>
+          {!collapseDesktop && (
+            <>
+              <ChatNavAccount />
+              <Box sx={{ flexGrow: 1 }} />
+            </>
+          )}
 
-        <IconButton onClick={handleToggleNav}>
-          <Iconify
-            icon={collapseDesktop ? 'eva:arrow-ios-forward-fill' : 'eva:arrow-ios-back-fill'}
-          />
-        </IconButton>
+          <IconButton onClick={handleToggleNav}>
+            <Iconify
+              icon={collapseDesktop ? 'eva:arrow-ios-forward-fill' : 'eva:arrow-ios-back-fill'}
+            />
+          </IconButton>
 
-        {!collapseDesktop && (
-          <Stack direction="row" spacing={0.5}>
-            <IconButton onClick={() => setGroupCreateOpen(true)} title="Create Group">
-              <Iconify width={24} icon="solar:users-group-two-rounded-bold" />
-            </IconButton>
-            <IconButton onClick={handleClickCompose} title="New Chat">
-              <Iconify width={24} icon="solar:user-plus-bold" />
-            </IconButton>
-          </Stack>
+          {!collapseDesktop && (
+            <Stack direction="row" spacing={0.5}>
+              <IconButton onClick={() => setGroupCreateOpen(true)} title="Create Group">
+                <Iconify width={24} icon="solar:users-group-two-rounded-bold" />
+              </IconButton>
+              <IconButton onClick={handleClickCompose} title="New Chat">
+                <Iconify width={24} icon="solar:user-plus-bold" />
+              </IconButton>
+            </Stack>
+          )}
+        </Stack>
+
+        <Box sx={{ p: 2.5, pt: 0 }}>{!collapseDesktop && renderSearchInput}</Box>
+
+        {loading ? (
+          renderLoading
+        ) : (
+          <Scrollbar sx={{ pb: 1 }}>
+            {searchContacts.query ? renderListResults : renderList}
+          </Scrollbar>
         )}
       </Stack>
-
-      <Box sx={{ p: 2.5, pt: 0 }}>{!collapseDesktop && renderSearchInput}</Box>
-
-      {loading ? (
-        renderLoading
-      ) : (
-        <Scrollbar sx={{ pb: 1 }}>
-          {searchContacts.query ? renderListResults : renderList}
-        </Scrollbar>
-      )}
-    </>
+    </ClickAwayListener>
   );
 
   return (

@@ -1,10 +1,12 @@
 import type { IChatMessage, IChatParticipant } from 'src/types/chat';
 
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import LinearProgress from '@mui/material/LinearProgress';
+
+import { useSearchParams } from 'src/routes/hooks';
 
 import { getMediaUrl } from 'src/utils/chat-utils';
 
@@ -44,6 +46,9 @@ function getMessageImageUrl(message: IChatMessage): string | null {
 export function ChatMessageList({ messages = [], participants, loading }: Props) {
   const { messagesEndRef } = useMessagesScroll(messages);
 
+  const searchParams = useSearchParams();
+  const targetMessageId = searchParams.get('messageId') || '';
+
   const slides = useMemo(() => {
     const list: { src: string }[] = [];
     messages.forEach((message) => {
@@ -56,6 +61,19 @@ export function ChatMessageList({ messages = [], participants, loading }: Props)
   }, [messages]);
 
   const lightbox = useLightBox(slides);
+
+  useEffect(() => {
+    if (targetMessageId && !loading) {
+      const timer = setTimeout(() => {
+        const element = document.getElementById(`msg-${targetMessageId}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+  }, [targetMessageId, messages, loading]);
 
   if (loading) {
     return (

@@ -1,17 +1,32 @@
-import type { IChatParticipant } from 'src/types/chat';
+import type { IChatMessage, IChatParticipant } from 'src/types/chat';
 
+import { mutate } from 'swr';
 import { useMemo, useState, useEffect, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
+import Avatar from '@mui/material/Avatar';
+import Typography from '@mui/material/Typography';
+import ListItemButton from '@mui/material/ListItemButton';
+import CircularProgress from '@mui/material/CircularProgress';
 
 import { paths } from 'src/routes/paths';
 import { useRouter, useSearchParams } from 'src/routes/hooks';
 
 import { useGroupSockets } from 'src/hooks/use-group-sockets';
 
+import { fToNow } from 'src/utils/format-time';
+
 import { CONFIG } from 'src/config-global';
 import { useChatStore } from 'src/store/useChatStore';
-import { useGetContacts, clickConversation, useGetConversation, useGetConversations } from 'src/actions/chat';
+import { 
+  useGetContacts,
+  clickConversation,
+  getMessageContext, 
+  useGetConversation, 
+  useGetConversations,
+  searchConversationMessages
+} from 'src/actions/chat';
 
 import { EmptyContent } from 'src/components/empty-content';
 
@@ -61,6 +76,60 @@ export function ChatView() {
   const [recipients, setRecipients] = useState<IChatParticipant[]>([]);
 
   const [searchMessageQuery, setSearchMessageQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<IChatMessage[]>([]);
+  const [searchLoading, setSearchLoading] = useState(false);
+
+  useEffect(() => {
+    if (!searchMessageQuery.trim() || !selectedConversationId) {
+      setSearchResults([]);
+      return () => {};
+    }
+
+    const delayDebounce = setTimeout(async () => {
+      setSearchLoading(true);
+      try {
+        const results = await searchConversationMessages(selectedConversationId, searchMessageQuery);
+        setSearchResults(results);
+      } catch (err) {
+        console.error('Failed to search conversation messages:', err);
+      } finally {
+        setSearchLoading(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(delayDebounce);
+  }, [searchMessageQuery, selectedConversationId]);
+
+  const handleSelectSearchedMessage = useCallback(
+    async (msgId: string) => {
+      setSearchMessageQuery('');
+      router.push(`${paths.dashboard.chat}?id=${selectedConversationId}&messageId=${msgId}`);
+      try {
+        const contextMessages = await getMessageContext(selectedConversationId, msgId);
+        if (contextMessages && contextMessages.length > 0) {
+          mutate(
+            `/api/v1/chats/conversations/${selectedConversationId}`,
+            (currentData: any) => {
+              if (!currentData) return currentData;
+              return {
+                ...currentData,
+                conversation: {
+                  ...currentData.conversation,
+                  messages: contextMessages,
+                },
+              };
+            },
+            { revalidate: false }
+          );
+        }
+      } catch (err) {
+        console.error('Failed to load message context:', err);
+      }
+    },
+    [selectedConversationId, router]
+  );
+
+
 
   const { conversations, conversationsLoading } = useGetConversations();
 
@@ -133,6 +202,60 @@ export function ChatView() {
     return msgs.filter((m) => m.body && m.body.toLowerCase().includes(query));
   }, [conversation?.messages, searchMessageQuery]);
 
+  const renderSearchConversationResults = (
+    <Stack sx={{ flex: '1 1 auto', bgcolor: 'background.paper', p: 3, overflowY: 'auto' }}>
+      <Typography variant="subtitle1" sx={{ mb: 2, color: 'text.secondary' }}>
+        Search results for &ldquo;{searchMessageQuery}&rdquo; ({searchResults.length})
+      </Typography>
+      {searchLoading ? (
+        <Stack alignItems="center" justifyContent="center" sx={{ py: 8 }}>
+          <CircularProgress size={32} color="inherit" />
+        </Stack>
+      ) : searchResults.length === 0 ? (
+        <Typography variant="body2" sx={{ color: 'text.disabled', textAlign: 'center', py: 8 }}>
+          No messages found
+        </Typography>
+      ) : (
+        <Stack spacing={1.5}>
+          {searchResults.map((msg) => {
+            const sender: any = participants.find((p) => p.id === msg.senderId) || (msg.senderId === user?.id ? user : null);
+            const senderName = msg.senderId === user?.id ? 'You' : (sender?.name || sender?.displayName || 'User');
+            const senderAvatar = msg.senderId === user?.id ? (user?.photoURL || (user as any)?.avatarUrl) : (sender?.avatarUrl || sender?.photoURL || '');
+
+            return (
+              <ListItemButton
+                key={msg.id}
+                onClick={() => handleSelectSearchedMessage(msg.id)}
+                sx={{
+                  p: 2,
+                  borderRadius: 1.5,
+                  bgcolor: 'background.neutral',
+                  '&:hover': { bgcolor: 'action.hover' },
+                  gap: 2,
+                }}
+              >
+                <Avatar src={senderAvatar} alt={senderName} />
+                <Stack sx={{ minWidth: 0, flexGrow: 1 }}>
+                  <Stack direction="row" alignItems="center" justifyContent="space-between">
+                    <Typography variant="subtitle2" noWrap>
+                      {senderName}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: 'text.disabled' }}>
+                      {fToNow(msg.createdAt)}
+                    </Typography>
+                  </Stack>
+                  <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
+                    {msg.body}
+                  </Typography>
+                </Stack>
+              </ListItemButton>
+            );
+          })}
+        </Stack>
+      )}
+    </Stack>
+  );
+
   return (
     <Box sx={{ display: 'flex', flex: '1 1 auto', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
       <Layout
@@ -173,11 +296,15 @@ export function ChatView() {
           main: (
             <>
               {selectedConversationId ? (
-                <ChatMessageList
-                  messages={filteredMessages}
-                  participants={participants}
-                  loading={conversationLoading}
-                />
+                searchMessageQuery.trim() ? (
+                  renderSearchConversationResults
+                ) : (
+                  <ChatMessageList
+                    messages={filteredMessages}
+                    participants={participants}
+                    loading={conversationLoading}
+                  />
+                )
               ) : (
                 <EmptyContent
                   imgUrl={`${CONFIG.site.basePath}/assets/icons/empty/ic-chat-active.svg`}

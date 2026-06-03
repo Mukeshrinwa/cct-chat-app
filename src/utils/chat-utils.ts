@@ -60,7 +60,13 @@ export const normalizeMessage = (message: Record<string, any>) => {
     _id: message._id,
     senderId: senderId ? String(senderId) : '',
     recipientId: message.recipientId ? String(message.recipientId) : undefined,
-    conversationId: message.conversationId ? String(message.conversationId) : undefined,
+    conversationId: (() => {
+      if (typeof message.conversationId === 'object' && message.conversationId !== null) {
+        return String(message.conversationId._id || message.conversationId.id || '');
+      }
+      return message.conversationId ? String(message.conversationId) : undefined;
+    })(),
+    conversationDetails: typeof message.conversationId === 'object' ? message.conversationId : null,
     text: message.text || message.message || message.content || '',
     createdAt: message.createdAt || new Date().toISOString(),
     messageId: String(message.messageId || message._id || window.crypto.randomUUID()),

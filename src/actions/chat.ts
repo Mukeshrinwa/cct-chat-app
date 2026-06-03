@@ -275,8 +275,15 @@ async function fetchConversationDetail(conversationId: string, currentUser: any)
   // 2. Fetch messages
   let messages: any[] = [];
   try {
-    const msgRes = await axios.get(`/api/v1/chats/messages/${realConvId}`);
-    messages = msgRes.data?.data || [];
+    const urlParams = new URLSearchParams(window.location.search);
+    const targetMsgId = urlParams.get('messageId');
+    if (targetMsgId) {
+      const msgRes = await axios.get(`/api/v1/chats/messages/${realConvId}/context/${targetMsgId}`);
+      messages = msgRes.data?.data || [];
+    } else {
+      const msgRes = await axios.get(`/api/v1/chats/messages/${realConvId}`);
+      messages = msgRes.data?.data || [];
+    }
     console.log('[DEBUG] Fetched messages:', messages);
   } catch (e) {
     console.error('Failed to fetch messages:', e);
@@ -834,4 +841,51 @@ export async function forwardMessage(messageId: string, conversationIds: string[
     throw error;
   }
 }
+
+// ----------------------------------------------------------------------
+
+function mapBackendMessageToChatMessage(msg: any): IChatMessage {
+  const normalized = normalizeMessage(msg);
+  return {
+    id: normalized?.messageId || '',
+    _id: normalized?._id || '',
+    body: normalized?.text || '',
+    senderId: normalized?.senderId || '',
+    contentType: normalized?.messageType || 'text',
+    createdAt: normalized?.createdAt || new Date().toISOString(),
+    attachments: normalized?.attachments || [],
+    isDeleted: normalized?.isDeletedForEveryone || false,
+    deleteType: msg.deleteType,
+    reactions: normalized?.reactions || [],
+    editedAt: msg.editedAt,
+    conversationId: normalized?.conversationId,
+    conversationDetails: normalized?.conversationDetails,
+    senderDetails: (normalized as any)?.senderDetails || msg.senderDetails,
+  } as any;
+}
+
+export async function searchConversationMessages(conversationId: string, query: string, page = 1, limit = 20) {
+  const res = await axios.get(`/api/v1/chats/messages/${conversationId}/search`, {
+    params: { q: query, page, limit },
+  });
+  const data = res.data?.data || res.data || [];
+  return Array.isArray(data) ? data.map(mapBackendMessageToChatMessage) : [];
+}
+
+export async function globalSearch(query: string, page = 1, limit = 20) {
+  const res = await axios.get(`/api/v1/chats/search`, {
+    params: { q: query, page, limit },
+  });
+  const data = res.data?.data || res.data || { users: [], messages: [] };
+  const users = Array.isArray(data.users) ? data.users.map(mapUserToParticipant) : [];
+  const messages = Array.isArray(data.messages) ? data.messages.map(mapBackendMessageToChatMessage) : [];
+  return { users, messages };
+}
+
+export async function getMessageContext(conversationId: string, messageId: string) {
+  const res = await axios.get(`/api/v1/chats/messages/${conversationId}/context/${messageId}`);
+  const data = res.data?.data || res.data || [];
+  return Array.isArray(data) ? data.map(mapBackendMessageToChatMessage) : [];
+}
+
 

@@ -44,6 +44,8 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
   const { user } = useMockedUser();
   const searchParams = useSearchParams();
   const conversationId = searchParams.get('id') || '';
+  const highlightedMessageId = searchParams.get('messageId') || '';
+  const isHighlighted = highlightedMessageId === message.id;
 
   const { me, senderDetails, hasImage } = useMessage({
     message,
@@ -219,6 +221,14 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
           flexDirection: 'row',
           alignItems: 'center',
           gap: 1,
+        }),
+        ...(isHighlighted && {
+          animation: 'highlight-pulse 2s ease-in-out',
+          '@keyframes highlight-pulse': {
+            '0%': { bgcolor: 'primary.light' },
+            '50%': { bgcolor: 'primary.main', color: 'primary.contrastText' },
+            '100%': { bgcolor: me ? 'primary.lighter' : 'background.neutral' },
+          },
         }),
       }}
     >
@@ -483,7 +493,7 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
   );
 
   return (
-    <Stack direction="row" justifyContent={me ? 'flex-end' : 'unset'} sx={{ mb: 3 }}>
+    <Stack id={`msg-${message.id}`} direction="row" justifyContent={me ? 'flex-end' : 'unset'} sx={{ mb: 3 }}>
       {!me && <Avatar alt={firstName} src={avatarUrl} sx={{ width: 32, height: 32, mr: 2 }} />}
 
       <Stack alignItems={me ? 'flex-end' : 'flex-start'}>

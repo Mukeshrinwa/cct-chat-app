@@ -17,7 +17,7 @@ const swrOptions = {
 
 export function useGetGroups() {
   const { data, isLoading, error, isValidating } = useSWR<any>(
-    '/api/v1/groups/list',
+    '/api/v1/groups',
     fetcher,
     swrOptions
   );
@@ -85,7 +85,7 @@ export async function createGroup(groupData: { name: string; participants: strin
       console.log('Group created via HTTP API fallback');
     }
 
-    mutate('/api/v1/groups/list');
+    mutate('/api/v1/groups');
     mutate('/api/v1/chats/conversations');
 
     return resData || { success: true };
@@ -110,7 +110,7 @@ export async function updateGroup(
   try {
     const res = await axios.patch(`/api/v1/groups/${groupId}`, updateData);
 
-    mutate('/api/v1/groups/list');
+    mutate('/api/v1/groups');
     mutate(`/api/v1/groups/${groupId}`);
     mutate('/api/v1/chats/conversations');
     if (res.data?.data?.conversationId?._id) {
@@ -130,7 +130,7 @@ export async function deleteGroup(groupId: string) {
   try {
     const res = await axios.delete(`/api/v1/groups/${groupId}`);
 
-    mutate('/api/v1/groups/list');
+    mutate('/api/v1/groups');
     mutate('/api/v1/chats/conversations');
 
     return res.data;
@@ -164,7 +164,7 @@ export async function addMembersToGroup(groupId: string, members: string[]) {
     }
 
     // Invalidate SWR caches so UI reflects the updated member list
-    mutate('/api/v1/groups/list');
+    mutate('/api/v1/groups');
     mutate(`/api/v1/groups/${groupId}`);
     mutate('/api/v1/chats/conversations');
 
@@ -181,7 +181,7 @@ export async function removeMemberFromGroup(groupId: string, memberId: string) {
   try {
     const res = await axios.post(`/api/v1/groups/${groupId}/remove-member`, { memberId });
 
-    mutate('/api/v1/groups/list');
+    mutate('/api/v1/groups');
     mutate(`/api/v1/groups/${groupId}`);
     mutate('/api/v1/chats/conversations');
 
@@ -198,7 +198,7 @@ export async function leaveGroupById(groupId: string) {
   try {
     const res = await axios.post(`/api/v1/groups/${groupId}/leave`, {});
 
-    mutate('/api/v1/groups/list');
+    mutate('/api/v1/groups');
     mutate(`/api/v1/groups/${groupId}`);
     mutate('/api/v1/chats/conversations');
 

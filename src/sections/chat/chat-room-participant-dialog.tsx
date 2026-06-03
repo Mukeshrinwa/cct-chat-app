@@ -7,9 +7,16 @@ import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 import DialogContent from '@mui/material/DialogContent';
 
+import { paths } from 'src/routes/paths';
+import { useRouter } from 'src/routes/hooks';
+
+import { useCall } from 'src/call';
 import { varAlpha } from 'src/theme/styles';
+import { useGetConversations } from 'src/actions/chat';
 
 import { Iconify } from 'src/components/iconify';
+
+import { useMockedUser } from 'src/auth/hooks';
 
 // ----------------------------------------------------------------------
 
@@ -20,6 +27,48 @@ type Props = {
 };
 
 export function ChatRoomParticipantDialog({ participant, open, onClose }: Props) {
+  const router = useRouter();
+  const { conversations } = useGetConversations();
+  const { startCall } = useCall();
+  const { user } = useMockedUser();
+
+  const isMe = user?.id === participant.id;
+
+  const handleMessage = () => {
+    onClose();
+
+    // Check if we already have a direct conversation with this user
+    const existingConv = conversations.allIds.find((convId) => {
+      const conv = conversations.byId[convId];
+      if (!conv || conv.type === 'GROUP' || conv.type === 'group') return false;
+      return conv.participants.some((p) => p.id === participant.id);
+    });
+
+    if (existingConv) {
+      router.push(`${paths.dashboard.chat}?id=${existingConv}`);
+    } else {
+      router.push(`${paths.dashboard.chat}?id=${participant.id}`);
+    }
+  };
+
+  const handleAudioCall = () => {
+    if (isMe) return;
+    onClose();
+    startCall([participant.id], 'audio');
+  };
+
+  const handleVideoCall = () => {
+    if (isMe) return;
+    onClose();
+    startCall([participant.id], 'video');
+  };
+
+  const handleEmail = () => {
+    if (participant.email) {
+      window.open(`mailto:${participant.email}`);
+    }
+  };
+
   return (
     <Dialog fullWidth maxWidth="xs" open={open} onClose={onClose}>
       <IconButton onClick={onClose} sx={{ position: 'absolute', right: 8, top: 8 }}>
@@ -53,6 +102,9 @@ export function ChatRoomParticipantDialog({ participant, open, onClose }: Props)
             <IconButton
               size="small"
               color="error"
+              onClick={handleAudioCall}
+              disabled={isMe}
+              title="Start audio call"
               sx={{
                 borderRadius: 1,
                 bgcolor: (theme) => varAlpha(theme.vars.palette.error.mainChannel, 0.08),
@@ -67,6 +119,9 @@ export function ChatRoomParticipantDialog({ participant, open, onClose }: Props)
             <IconButton
               size="small"
               color="info"
+              onClick={handleMessage}
+              disabled={isMe}
+              title="Send message"
               sx={{
                 borderRadius: 1,
                 bgcolor: (theme) => varAlpha(theme.vars.palette.info.mainChannel, 0.08),
@@ -81,6 +136,9 @@ export function ChatRoomParticipantDialog({ participant, open, onClose }: Props)
             <IconButton
               size="small"
               color="primary"
+              onClick={handleEmail}
+              disabled={!participant.email}
+              title={participant.email ? `Email: ${participant.email}` : 'No email address'}
               sx={{
                 borderRadius: 1,
                 bgcolor: (theme) => varAlpha(theme.vars.palette.primary.mainChannel, 0.08),
@@ -95,6 +153,9 @@ export function ChatRoomParticipantDialog({ participant, open, onClose }: Props)
             <IconButton
               size="small"
               color="secondary"
+              onClick={handleVideoCall}
+              disabled={isMe}
+              title="Start video call"
               sx={{
                 borderRadius: 1,
                 bgcolor: (theme) => varAlpha(theme.vars.palette.secondary.mainChannel, 0.08),
@@ -111,3 +172,4 @@ export function ChatRoomParticipantDialog({ participant, open, onClose }: Props)
     </Dialog>
   );
 }
+

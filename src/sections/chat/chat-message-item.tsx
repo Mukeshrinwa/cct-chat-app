@@ -9,11 +9,13 @@ import Dialog from '@mui/material/Dialog';
 import Button from '@mui/material/Button';
 import Popover from '@mui/material/Popover';
 import TextField from '@mui/material/TextField';
+import { useTheme } from '@mui/material/styles';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
+import useMediaQuery from '@mui/material/useMediaQuery';
 
 import { useSearchParams } from 'src/routes/hooks';
 
@@ -57,7 +59,7 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
   const { body, createdAt } = message;
 
   const imageUrl = message.attachments?.[0]?.preview || getMediaUrl(body);
-  
+
   const isAudio =
     message.contentType === 'audio' ||
     (message as any).type === 'audio' ||
@@ -92,6 +94,10 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
 
   // Reactions Popover State
   const [reactionAnchorEl, setReactionAnchorEl] = useState<HTMLButtonElement | null>(null);
+
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const [mobileActionsPosition, setMobileActionsPosition] = useState<{ top: number; left: number } | null>(null);
 
   const handleEditStart = () => {
     setIsEditing(true);
@@ -145,6 +151,43 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
   };
 
   const emojisList = ['❤️', '👍', '😂', '😮', '😢', '🙏', '🎉', '🔥'];
+
+  const handleCloseMobileActions = () => {
+    setMobileActionsPosition(null);
+  };
+
+  const handleBubbleClick = (event: React.MouseEvent<HTMLElement>) => {
+    if (message.isDeleted || isEditing) return;
+
+    const target = event.target as HTMLElement;
+    if (
+      target.closest('audio') ||
+      target.closest('a') ||
+      target.closest('button') ||
+      target.closest('img')
+    ) {
+      return;
+    }
+
+    if (isMobile) {
+      setMobileActionsPosition({
+        top: event.clientY,
+        left: event.clientX,
+      });
+    }
+  };
+
+  const handleBubbleContextMenu = (event: React.MouseEvent<HTMLElement>) => {
+    if (message.isDeleted || isEditing) return;
+
+    if (isMobile) {
+      event.preventDefault();
+      setMobileActionsPosition({
+        top: event.clientY,
+        left: event.clientX,
+      });
+    }
+  };
 
   let tickIcon = 'eva:checkmark-fill';
   let tickColor = 'text.disabled';
@@ -216,7 +259,7 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
           color: 'text.disabled',
           fontStyle: 'italic',
           bgcolor: 'background.neutral',
-          border: (theme) => `1px solid ${theme.vars.palette.divider}`,
+          border: (t) => `1px solid ${t.vars.palette.divider}`,
           display: 'flex',
           flexDirection: 'row',
           alignItems: 'center',
@@ -290,40 +333,40 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
       ) : message.attachments && message.attachments.length > 0 ? (
         <Stack spacing={1} sx={{ width: 220, p: 0.5 }}>
           {message.attachments.map((att, idx) => (
-              <Stack
-                key={att.name + idx}
-                spacing={1.5}
-                direction="row"
-                alignItems="center"
-                onClick={() => window.open(att.preview || att.path, '_blank')}
-                sx={{
-                  p: 1,
-                  borderRadius: 1,
-                  cursor: 'pointer',
-                  bgcolor: me ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.03)',
-                  '&:hover': {
-                    bgcolor: me ? 'rgba(255, 255, 255, 0.16)' : 'rgba(0, 0, 0, 0.06)',
-                  },
-                }}
-              >
-                <FileThumbnail
-                  file={att.name}
-                  slotProps={{ icon: { width: 24, height: 24 } }}
-                  sx={{ width: 40, height: 40 }}
-                />
-                
-                <Stack spacing={0.25} sx={{ minWidth: 0, flexGrow: 1 }}>
-                  <Typography variant="subtitle2" noWrap sx={{ fontSize: '13px', color: me ? 'inherit' : 'text.primary' }}>
-                    {att.name}
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: me ? 'rgba(255, 255, 255, 0.7)' : 'text.secondary', fontSize: '11px' }}>
-                    {fData(att.size)}
-                  </Typography>
-                </Stack>
-                
-                <Iconify icon="solar:download-minimalistic-bold" width={20} sx={{ color: me ? 'inherit' : 'text.secondary' }} />
+            <Stack
+              key={att.name + idx}
+              spacing={1.5}
+              direction="row"
+              alignItems="center"
+              onClick={() => window.open(att.preview || att.path, '_blank')}
+              sx={{
+                p: 1,
+                borderRadius: 1,
+                cursor: 'pointer',
+                bgcolor: me ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.03)',
+                '&:hover': {
+                  bgcolor: me ? 'rgba(255, 255, 255, 0.16)' : 'rgba(0, 0, 0, 0.06)',
+                },
+              }}
+            >
+              <FileThumbnail
+                file={att.name}
+                slotProps={{ icon: { width: 24, height: 24 } }}
+                sx={{ width: 40, height: 40 }}
+              />
+
+              <Stack spacing={0.25} sx={{ minWidth: 0, flexGrow: 1 }}>
+                <Typography variant="subtitle2" noWrap sx={{ fontSize: '13px', color: me ? 'inherit' : 'text.primary' }}>
+                  {att.name}
+                </Typography>
+                <Typography variant="caption" sx={{ color: me ? 'rgba(255, 255, 255, 0.7)' : 'text.secondary', fontSize: '11px' }}>
+                  {fData(att.size)}
+                </Typography>
               </Stack>
-            ))}
+
+              <Iconify icon="solar:download-minimalistic-bold" width={20} sx={{ color: me ? 'inherit' : 'text.secondary' }} />
+            </Stack>
+          ))}
         </Stack>
       ) : (
         body
@@ -341,8 +384,8 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
         display: { xs: 'none', md: 'flex' },
         position: 'absolute',
         transform: 'translateY(-50%)',
-        transition: (theme) =>
-          theme.transitions.create(['opacity'], { duration: theme.transitions.duration.shorter }),
+        transition: (t) =>
+          t.transitions.create(['opacity'], { duration: t.transitions.duration.shorter }),
         // Receiver: actions appear to the RIGHT of the bubble
         right: me ? 'unset' : -112,
         // Sender: actions appear to the LEFT of the bubble
@@ -399,8 +442,8 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
               py: 0.25,
               borderRadius: 1,
               bgcolor: hasReacted ? 'primary.lighter' : 'background.neutral',
-              border: (theme) =>
-                `1px solid ${hasReacted ? theme.vars.palette.primary.light : theme.vars.palette.divider}`,
+              border: (t) =>
+                `1px solid ${hasReacted ? t.vars.palette.primary.light : t.vars.palette.divider}`,
               cursor: 'pointer',
               fontSize: 12,
               '&:hover': {
@@ -444,7 +487,7 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
         sx: {
           p: 0.5,
           borderRadius: 1.5,
-          boxShadow: (theme) => theme.customShadows.dropdown,
+          boxShadow: (t) => t.customShadows.dropdown,
         },
       }}
     >
@@ -492,6 +535,104 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
     </Dialog>
   );
 
+  const renderMobileActionsPopover = (
+    <Popover
+      open={Boolean(mobileActionsPosition)}
+      anchorReference="anchorPosition"
+      anchorPosition={mobileActionsPosition || undefined}
+      onClose={handleCloseMobileActions}
+      PaperProps={{
+        sx: {
+          p: 1.5,
+          width: 260,
+          borderRadius: 1,
+          boxShadow: (t) => t.customShadows.dropdown,
+        },
+      }}
+    >
+      {/* Emoji Reactions Row */}
+      <Stack
+        direction="row"
+        spacing={0.5}
+        sx={{
+          pb: 1,
+          mb: 1.5,
+          borderBottom: (t) => `1px solid ${t.vars.palette.divider}`,
+          justifyContent: 'flex-start',
+          flexWrap: 'wrap',
+          gap: 0.5,
+        }}
+      >
+        {emojisList.map((emoji) => (
+          <IconButton
+            key={emoji}
+            size="small"
+            onClick={() => {
+              handleReact(emoji);
+              handleCloseMobileActions();
+            }}
+            sx={{
+              fontSize: 20,
+              transition: 'transform 0.1s',
+              '&:hover': {
+                transform: 'scale(1.2)',
+                backgroundColor: 'transparent',
+              },
+            }}
+          >
+            {emoji}
+          </IconButton>
+        ))}
+      </Stack>
+
+      <Stack spacing={0.5}>
+        <Button
+          fullWidth
+          variant="text"
+          color="inherit"
+          startIcon={<Iconify icon="solar:share-bold" width={20} />}
+          onClick={() => {
+            setForwardDialogOpen(true);
+            handleCloseMobileActions();
+          }}
+          sx={{ justifyContent: 'flex-start', py: 1 }}
+        >
+          Forward
+        </Button>
+
+        {me && (
+          <Button
+            fullWidth
+            variant="text"
+            color="inherit"
+            startIcon={<Iconify icon="solar:pen-bold" width={20} />}
+            onClick={() => {
+              handleEditStart();
+              handleCloseMobileActions();
+            }}
+            sx={{ justifyContent: 'flex-start', py: 1 }}
+          >
+            Edit
+          </Button>
+        )}
+
+        <Button
+          fullWidth
+          variant="text"
+          color="error"
+          startIcon={<Iconify icon="solar:trash-bin-trash-bold" width={20} />}
+          onClick={() => {
+            handleDeleteOpen();
+            handleCloseMobileActions();
+          }}
+          sx={{ justifyContent: 'flex-start', py: 1 }}
+        >
+          Delete
+        </Button>
+      </Stack>
+    </Popover>
+  );
+
   return (
     <Stack id={`msg-${message.id}`} direction="row" justifyContent={me ? 'flex-end' : 'unset'} sx={{ mb: 3 }}>
       {!me && <Avatar alt={firstName} src={avatarUrl} sx={{ width: 32, height: 32, mr: 2 }} />}
@@ -502,10 +643,13 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
         <Stack
           direction="row"
           alignItems="center"
+          onClick={handleBubbleClick}
+          onContextMenu={handleBubbleContextMenu}
           sx={{
             position: 'relative',
             overflow: 'visible',
             '&:hover': { '& .message-actions': { opacity: 1 } },
+            cursor: isMobile ? 'pointer' : 'default',
           }}
         >
           {renderBody}
@@ -516,6 +660,7 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
       </Stack>
 
       {renderReactionPopover}
+      {renderMobileActionsPopover}
       {renderDeleteDialog}
 
       {forwardDialogOpen && (

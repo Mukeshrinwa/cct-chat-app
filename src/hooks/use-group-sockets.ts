@@ -93,7 +93,7 @@ export const useGroupSockets = (currentUserId: string | undefined) => {
         );
         // ───────────────────────────────────────────────────────────────────
 
-        mutate('/api/v1/groups/list');
+        mutate('/api/v1/groups');
         mutate(`/api/v1/groups/${group._id}`);
         mutate('/api/v1/chats/conversations');
       }

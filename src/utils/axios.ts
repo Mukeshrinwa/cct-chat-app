@@ -131,6 +131,7 @@ export const endpoints = {
   },
   user: {
     update: '/api/v1/users/update',
+    avatar: '/api/v1/users/avatar',
     search: '/api/v1/users/search',
     getAll: '/api/v1/users/get',
     block: '/api/v1/users/block',

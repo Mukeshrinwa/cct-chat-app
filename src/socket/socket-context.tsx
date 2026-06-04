@@ -482,7 +482,113 @@ export function SocketProvider({ children }: SocketProviderProps) {
     socketInstance.on(
       'user_updated',
       (data: { userId: string; name: string; avatar: string; about: string; privacy: any }) => {
+        // Update Zustand store
         useChatStore.getState().updateConversationUser(data.userId, data);
+
+        // Update SWR cache for active conversation details
+        const liveActiveConversationId = useChatStore.getState().activeConversationId;
+        if (liveActiveConversationId) {
+          const detailCacheKey = `/api/v1/chats/conversations/${liveActiveConversationId}`;
+          if (cache.get(detailCacheKey)?.data !== undefined) {
+            mutate(
+              detailCacheKey,
+              (current: any) => {
+                if (!current || !current.conversation) return current;
+                return {
+                  ...current,
+                  conversation: {
+                    ...current.conversation,
+                    participants: current.conversation.participants.map((p: any) => {
+                      if (p.id === data.userId) {
+                        return {
+                          ...p,
+                          name: data.name !== undefined ? data.name : p.name,
+                          avatarUrl: data.avatar !== undefined ? data.avatar : p.avatarUrl,
+                          about: data.about !== undefined ? data.about : p.about,
+                        };
+                      }
+                      return p;
+                    }),
+                  },
+                };
+              },
+              { revalidate: false }
+            );
+          }
+        }
+
+        // Update SWR cache for conversations list
+        const conversationsListKey = '/api/v1/chats/conversations';
+        if (cache.get(conversationsListKey)?.data !== undefined) {
+          mutate(
+            conversationsListKey,
+            (current: any) => {
+              if (!current || !current.data) return current;
+              return {
+                ...current,
+                data: current.data.map((c: any) => {
+                  if (!c.isGroup && c.otherUser?._id === data.userId) {
+                    return {
+                      ...c,
+                      name: data.name !== undefined ? data.name : c.name,
+                      avatar: data.avatar !== undefined ? data.avatar : c.avatar,
+                      otherUser: { ...c.otherUser, ...data },
+                    };
+                  }
+                  const hasParticipant = c.participants?.some(
+                    (p: any) => (p._id || p.id || p) === data.userId
+                  );
+                  if (hasParticipant) {
+                    return {
+                      ...c,
+                      participants: c.participants.map((p: any) => {
+                        const pId = p._id || p.id || p;
+                        if (pId === data.userId) {
+                          return typeof p === 'object'
+                            ? {
+                                ...p,
+                                ...data,
+                                name: data.name !== undefined ? data.name : p.name,
+                                avatar: data.avatar !== undefined ? data.avatar : p.avatar,
+                                about: data.about !== undefined ? data.about : p.about,
+                              }
+                            : p;
+                        }
+                        return p;
+                      }),
+                    };
+                  }
+                  return c;
+                }),
+              };
+            },
+            { revalidate: false }
+          );
+        }
+
+        // Update SWR cache for contacts list
+        const contactsCacheKey = '/api/v1/users/get';
+        if (cache.get(contactsCacheKey)?.data !== undefined) {
+          mutate(
+            contactsCacheKey,
+            (current: any) => {
+              if (!current || !current.data) return current;
+              return {
+                ...current,
+                data: current.data.map((u: any) => {
+                  if (u._id === data.userId) {
+                    return {
+                      ...u,
+                      ...data,
+                    };
+                  }
+                  return u;
+                }),
+              };
+            },
+            { revalidate: false }
+          );
+        }
       }
     );
 

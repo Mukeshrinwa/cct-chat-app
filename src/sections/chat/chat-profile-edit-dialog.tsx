@@ -26,6 +26,7 @@ import InputAdornment from '@mui/material/InputAdornment';
 import CircularProgress from '@mui/material/CircularProgress';
 import FormControlLabel from '@mui/material/FormControlLabel';
 
+import { socketService } from 'src/socket/socket-service';
 import { uploadAvatar, updateProfile, checkUsernameAvailability } from 'src/api/profile';
 
 import { toast } from 'src/components/snackbar';
@@ -142,6 +143,29 @@ export function ChatProfileEditDialog({ open, onClose }: Props) {
         setAvatar(newAvatarUrl);
         setAvatarPreview(newAvatarUrl);
         toast.success('Photo uploaded successfully!');
+
+        // Update local session data so header avatar updates instantly
+        await checkUserSession?.();
+
+        // Emit socket event to notify other clients
+        try {
+          if (socketService.isConnected()) {
+            socketService.emit('user_updated', {
+              userId: authUser?._id || authUser?.id,
+              name,
+              avatar: newAvatarUrl,
+              about,
+              privacy: {
+                profilePhoto,
+                lastSeen,
+                about: aboutPrivacy,
+                readReceipts,
+              },
+            });
+          }
+        } catch (err) {
+          console.error('Failed to emit user_updated via socket:', err);
+        }
       } catch (error) {
         console.error(error);
         // Revert preview on error
@@ -156,7 +180,7 @@ export function ChatProfileEditDialog({ open, onClose }: Props) {
         }
       }
     },
-    [avatar]
+    [avatar, authUser, name, about, profilePhoto, lastSeen, aboutPrivacy, readReceipts, checkUserSession]
   );
 
   const handleSave = async () => {
@@ -184,6 +208,26 @@ export function ChatProfileEditDialog({ open, onClose }: Props) {
 
       // Refresh user session to get updated data
       await checkUserSession?.();
+
+      // Emit socket event to notify other clients
+      try {
+        if (socketService.isConnected()) {
+          socketService.emit('user_updated', {
+            userId: authUser?._id || authUser?.id,
+            name,
+            avatar,
+            about,
+            privacy: {
+              profilePhoto,
+              lastSeen,
+              about: aboutPrivacy,
+              readReceipts,
+            },
+          });
+        }
+      } catch (err) {
+        console.error('Failed to emit user_updated via socket:', err);
+      }
 
       toast.success('Profile updated successfully!');
       onClose();

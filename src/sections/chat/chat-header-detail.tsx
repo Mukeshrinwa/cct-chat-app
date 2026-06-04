@@ -154,7 +154,7 @@ export function ChatHeaderDetail({
 
   const handleMute = useCallback(async () => {
     try {
-      await muteConversation(conversationId);
+      await muteConversation(conversationId, !isMuted);
       toast.success(isMuted ? 'Chat unmuted' : 'Chat muted');
       popover.onClose();
     } catch (err) {
@@ -165,7 +165,7 @@ export function ChatHeaderDetail({
 
   const handlePin = useCallback(async () => {
     try {
-      await pinConversation(conversationId);
+      await pinConversation(conversationId, !isPinned);
       toast.success(isPinned ? 'Chat unpinned' : 'Chat pinned');
       popover.onClose();
     } catch (err) {
@@ -176,7 +176,7 @@ export function ChatHeaderDetail({
 
   const handleArchive = useCallback(async () => {
     try {
-      await archiveConversation(conversationId);
+      await archiveConversation(conversationId, !isArchived);
       
       // Update local storage for client-side filtering compatibility
       try {

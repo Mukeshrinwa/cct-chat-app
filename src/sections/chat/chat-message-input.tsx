@@ -22,6 +22,7 @@ import { fSub, today } from 'src/utils/format-time';
 import { useSocket } from 'src/socket';
 import { sendMessage, createConversation } from 'src/actions/chat';
 
+import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 
 import { useMockedUser } from 'src/auth/hooks';
@@ -320,7 +321,13 @@ export function ChatMessageInput({
   }, []);
 
   const handleChangeMessage = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    setMessage(event.target.value);
+    const val = event.target.value;
+    if (val.length > 4000) {
+      toast.error('Message is too long (maximum 4000 characters)');
+      setMessage(val.substring(0, 4000));
+      return;
+    }
+    setMessage(val);
 
     if (selectedConversationId) {
       const now = Date.now();
@@ -345,6 +352,10 @@ export function ChatMessageInput({
   const onSubmitMessage = useCallback(async () => {
     try {
       if (message.trim()) {
+        if (message.length > 4000) {
+          toast.error('Message is too long (maximum 4000 characters)');
+          return;
+        }
         if (selectedConversationId) {
           await sendMessage(selectedConversationId, messageData);
         } else {
@@ -557,6 +568,7 @@ export function ChatMessageInput({
           onChange={handleChangeMessage}
           placeholder={!isUserMember ? "You are no longer a member of this group" : "Type a message"}
           disabled={disabled || !isUserMember}
+          inputProps={{ maxLength: 4000 }}
           startAdornment={
             <Stack direction="row" sx={{ flexShrink: 0 }}>
               <IconButton onClick={handleOpenEmoji} disabled={isRecording || !isUserMember}>

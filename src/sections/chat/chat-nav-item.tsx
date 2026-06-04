@@ -186,16 +186,30 @@ export function ChatNavItem({
                     {fToNow(lastActivity)}
                   </Typography>
 
-                  {!!conversation.unreadCount && (
-                    <Box
-                      sx={{
-                        width: 8,
-                        height: 8,
-                        bgcolor: 'info.main',
-                        borderRadius: '50%',
-                      }}
-                    />
-                  )}
+                  <Stack direction="row" alignItems="center" spacing={1} sx={{ mt: 0.5 }}>
+                    {conversation.isPinned && (
+                      <Iconify
+                        icon="solar:pin-bold"
+                        sx={{
+                          width: 16,
+                          height: 16,
+                          color: 'text.disabled',
+                          transform: 'rotate(45deg)',
+                        }}
+                      />
+                    )}
+
+                    {!!conversation.unreadCount && (
+                      <Box
+                        sx={{
+                          width: 8,
+                          height: 8,
+                          bgcolor: 'info.main',
+                          borderRadius: '50%',
+                        }}
+                      />
+                    )}
+                  </Stack>
                 </>
               )}
             </Stack>

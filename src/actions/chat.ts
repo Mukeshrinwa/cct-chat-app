@@ -195,6 +195,9 @@ export function useGetConversations() {
         unreadCount: conv.unreadCount || 0,
         messages,
         participants: participantsList,
+        isPinned: conv.pinnedAt ? true : (conv.isPinned !== undefined ? conv.isPinned : !!conv.pinned),
+        isMuted: (conv.muteUntil && new Date(conv.muteUntil).getTime() > Date.now()) ? true : (conv.isMuted !== undefined ? conv.isMuted : !!conv.muted),
+        isArchived: conv.isArchived !== undefined ? conv.isArchived : (conv.archivedAt ? true : !!conv.archived),
       };
     });
 
@@ -452,6 +455,9 @@ async function fetchConversationDetail(conversationId: string, currentUser: any)
       unreadCount: conversationData?.unreadCount || 0,
       messages: mappedMessages,
       participants,
+      isPinned: conversationData?.pinnedAt ? true : (conversationData?.isPinned !== undefined ? conversationData.isPinned : !!conversationData?.pinned),
+      isMuted: (conversationData?.muteUntil && new Date(conversationData.muteUntil).getTime() > Date.now()) ? true : (conversationData?.isMuted !== undefined ? conversationData.isMuted : !!conversationData?.muted),
+      isArchived: conversationData?.isArchived !== undefined ? conversationData.isArchived : (conversationData?.archivedAt ? true : !!conversationData?.archived),
     },
   };
   console.log('[DEBUG] fetchConversationDetail completed with ID:', conversationId, 'returning:', result);
@@ -922,9 +928,9 @@ export async function getMessageContext(conversationId: string, messageId: strin
 
 // ----------------------------------------------------------------------
 
-export async function muteConversation(conversationId: string) {
+export async function muteConversation(conversationId: string, isMuted: boolean) {
   try {
-    const res = await axios.post(`/api/v1/chats/conversation/${conversationId}/mute`);
+    const res = await axios.post(`/api/v1/chats/conversation/${conversationId}/mute`, { isMuted });
     mutate(`/api/v1/chats/conversations/${conversationId}`);
     mutate('/api/v1/chats/conversations');
     return res.data;
@@ -936,9 +942,9 @@ export async function muteConversation(conversationId: string) {
 
 // ----------------------------------------------------------------------
 
-export async function pinConversation(conversationId: string) {
+export async function pinConversation(conversationId: string, isPinned: boolean) {
   try {
-    const res = await axios.post(`/api/v1/chats/conversation/${conversationId}/pin`);
+    const res = await axios.post(`/api/v1/chats/conversation/${conversationId}/pin`, { isPinned });
     mutate(`/api/v1/chats/conversations/${conversationId}`);
     mutate('/api/v1/chats/conversations');
     return res.data;
@@ -950,9 +956,9 @@ export async function pinConversation(conversationId: string) {
 
 // ----------------------------------------------------------------------
 
-export async function archiveConversation(conversationId: string) {
+export async function archiveConversation(conversationId: string, isArchived: boolean) {
   try {
-    const res = await axios.post(`/api/v1/chats/conversation/${conversationId}/archive`);
+    const res = await axios.post(`/api/v1/chats/conversation/${conversationId}/archive`, { isArchived });
     mutate(`/api/v1/chats/conversations/${conversationId}`);
     mutate('/api/v1/chats/conversations');
     return res.data;

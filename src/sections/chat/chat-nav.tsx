@@ -106,7 +106,7 @@ export function ChatNav({
 
   const handleArchive = useCallback(async (id: string) => {
     try {
-      await archiveConversation(id);
+      await archiveConversation(id, true);
     } catch (err) {
       console.error('Failed to archive on server:', err);
     }
@@ -119,7 +119,7 @@ export function ChatNav({
 
   const handleUnarchive = useCallback(async (id: string) => {
     try {
-      await archiveConversation(id);
+      await archiveConversation(id, false);
     } catch (err) {
       console.error('Failed to unarchive on server:', err);
     }
@@ -279,6 +279,22 @@ export function ChatNav({
           .filter((conversationId) => {
             const isIncluded = archivedIds.includes(conversationId);
             return showArchived ? isIncluded : !isIncluded;
+          })
+          .sort((a, b) => {
+            const convA = conversations.byId[a];
+            const convB = conversations.byId[b];
+            
+            const pinA = convA?.isPinned ? 1 : 0;
+            const pinB = convB?.isPinned ? 1 : 0;
+            if (pinA !== pinB) {
+              return pinB - pinA;
+            }
+            
+            const lastMsgA = convA?.messages?.[convA.messages.length - 1];
+            const lastMsgB = convB?.messages?.[convB.messages.length - 1];
+            const timeA = lastMsgA?.createdAt ? new Date(lastMsgA.createdAt as any).getTime() : 0;
+            const timeB = lastMsgB?.createdAt ? new Date(lastMsgB.createdAt as any).getTime() : 0;
+            return timeB - timeA;
           })
           .map((conversationId) => (
             <ChatNavItem

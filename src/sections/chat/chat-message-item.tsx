@@ -108,9 +108,16 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
     return getMediaUrl(body);
   })();
 
+  const isTextMsg =
+    !hasImage &&
+    !isAudio &&
+    !(message.attachments && message.attachments.length > 0) &&
+    !message.isDeleted;
+
   // Edit State
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(body);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   // Delete Dialog State
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -136,6 +143,10 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
 
   const handleEditSave = async () => {
     if (!editText.trim()) return;
+    if (editText.length > 4000) {
+      toast.error('Message is too long (maximum 4000 characters)');
+      return;
+    }
     try {
       await editMessage(message._id || message.id, editText, [], conversationId);
       setIsEditing(false);
@@ -313,10 +324,19 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
             fullWidth
             multiline
             value={editText}
-            onChange={(e) => setEditText(e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val.length > 4000) {
+                toast.error('Message is too long (maximum 4000 characters)');
+                setEditText(val.substring(0, 4000));
+              } else {
+                setEditText(val);
+              }
+            }}
             size="small"
             variant="standard"
             autoFocus
+            inputProps={{ maxLength: 4000 }}
             InputProps={{
               disableUnderline: true,
               sx: {
@@ -396,7 +416,47 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
           ))}
         </Stack>
       ) : (
-        body
+        <>
+          {body.length > 300 && !isExpanded ? (
+            <>
+              {body.slice(0, 300)}...{' '}
+              <Box
+                component="span"
+                onClick={() => setIsExpanded(true)}
+                sx={{
+                  color: me ? 'inherit' : 'primary.main',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  textDecoration: 'none',
+                  '&:hover': { textDecoration: 'underline' },
+                }}
+              >
+                Read more
+              </Box>
+            </>
+          ) : body.length > 300 ? (
+            <>
+              {body}{' '}
+              <Box
+                component="span"
+                onClick={() => setIsExpanded(false)}
+                sx={{
+                  color: me ? 'inherit' : 'primary.main',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  textDecoration: 'none',
+                  '&:hover': { textDecoration: 'underline' },
+                  display: 'inline-block',
+                  ml: 0.5,
+                }}
+              >
+                Read less
+              </Box>
+            </>
+          ) : (
+            body
+          )}
+        </>
       )}
     </Stack>
   );
@@ -427,7 +487,7 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
         <Iconify icon="eva:smiling-face-fill" width={16} />
       </IconButton>
 
-      {me && (
+      {me && isTextMsg && (
         <IconButton size="small" onClick={handleEditStart}>
           <Iconify icon="solar:pen-bold" width={16} />
         </IconButton>
@@ -627,7 +687,7 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
           Forward
         </Button>
 
-        {me && (
+        {me && isTextMsg && (
           <Button
             fullWidth
             variant="text"

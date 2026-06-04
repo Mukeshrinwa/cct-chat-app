@@ -66,6 +66,7 @@ export function ChatProfileEditDialog({ open, onClose }: Props) {
   // Privacy settings
   const [profilePhoto, setProfilePhoto] = useState<'everyone' | 'contacts' | 'nobody'>('everyone');
   const [lastSeen, setLastSeen] = useState<'everyone' | 'contacts' | 'nobody'>('contacts');
+  const [aboutPrivacy, setAboutPrivacy] = useState<'everyone' | 'contacts' | 'nobody'>('everyone');
   const [readReceipts, setReadReceipts] = useState(true);
 
   // Initialize form with current user data
@@ -79,6 +80,7 @@ export function ChatProfileEditDialog({ open, onClose }: Props) {
       setAvatarPreview(authUser.avatar || authUser.photoURL || '');
       setProfilePhoto(authUser.privacy?.profilePhoto || 'everyone');
       setLastSeen(authUser.privacy?.lastSeen || 'contacts');
+      setAboutPrivacy(authUser.privacy?.about || 'everyone');
       setReadReceipts(authUser.privacy?.readReceipts ?? true);
       setUsernameStatus('same');
       setErrorMsg('');
@@ -175,6 +177,7 @@ export function ChatProfileEditDialog({ open, onClose }: Props) {
         privacy: {
           profilePhoto,
           lastSeen,
+          about: aboutPrivacy,
           readReceipts,
         },
       });
@@ -397,6 +400,32 @@ export function ChatProfileEditDialog({ open, onClose }: Props) {
                 label="Visible to"
                 onChange={(e) =>
                   setLastSeen(e.target.value as 'everyone' | 'contacts' | 'nobody')
+                }
+              >
+                <MenuItem value="everyone">Everyone</MenuItem>
+                <MenuItem value="contacts">My Contacts</MenuItem>
+                <MenuItem value="nobody">Nobody</MenuItem>
+              </Select>
+            </FormControl>
+          </Stack>
+
+          <Divider />
+
+          <Stack spacing={1}>
+            <Stack direction="row" alignItems="center" spacing={1}>
+              <Iconify icon="solar:info-circle-bold" width={20} sx={{ color: 'primary.main' }} />
+              <Typography variant="subtitle2">About</Typography>
+            </Stack>
+            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+              Who can see your about info
+            </Typography>
+            <FormControl size="small" fullWidth>
+              <InputLabel>Visible to</InputLabel>
+              <Select
+                value={aboutPrivacy}
+                label="Visible to"
+                onChange={(e) =>
+                  setAboutPrivacy(e.target.value as 'everyone' | 'contacts' | 'nobody')
                 }
               >
                 <MenuItem value="everyone">Everyone</MenuItem>

@@ -15,6 +15,7 @@ export type UpdateProfileParams = {
   privacy?: {
     profilePhoto?: 'everyone' | 'contacts' | 'nobody';
     lastSeen?: 'everyone' | 'contacts' | 'nobody';
+    about?: 'everyone' | 'contacts' | 'nobody';
     readReceipts?: boolean;
   };
 };

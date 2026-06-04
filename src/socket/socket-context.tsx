@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { mutate, useSWRConfig } from 'swr';
 import React, { useMemo, useState, useEffect, useContext, createContext } from 'react';
 
+import axios from 'src/utils/axios';
 import { normalizeMessage } from 'src/utils/chat-utils';
 
 import { clickConversation } from 'src/actions/chat';
@@ -224,6 +225,15 @@ export function SocketProvider({ children }: SocketProviderProps) {
       const { conversationId, senderId } = normalized;
 
       if (conversationId && conversationId === activeConvId && senderId !== currentUserId) {
+        // Emit mark_read to socket immediately (bypass clickConversation debounce for instant read ticks)
+        socketInstance.emit('mark_read', { conversationId });
+        
+        // Mark as read in backend via HTTP API instantly
+        axios.post(`/api/v1/chats/read/${conversationId}`).catch((err) => {
+          console.error('[NEW_MESSAGE_READ] HTTP mark read error:', err);
+        });
+
+        // Trigger clickConversation for SWR mutate list update
         clickConversation(conversationId);
       }
 
@@ -237,6 +247,7 @@ export function SocketProvider({ children }: SocketProviderProps) {
         attachments: (normalized as any).attachments || [],
         isDeleted: normalized.isDeletedForEveryone || false,
         reactions: normalized.reactions || [],
+        status: normalized.status || data.status || 'sent',
       };
 
       if (conversationId) {

@@ -304,6 +304,7 @@ async function fetchConversationDetail(conversationId: string, currentUser: any)
       deleteType: msg.deleteType,
       reactions: normalized?.reactions || [],
       editedAt: msg.editedAt,
+      status: normalized?.status || msg.status || 'sent',
     };
   });
 
@@ -858,6 +859,7 @@ function mapBackendMessageToChatMessage(msg: any): IChatMessage {
     deleteType: msg.deleteType,
     reactions: normalized?.reactions || [],
     editedAt: msg.editedAt,
+    status: normalized?.status || msg.status || 'sent',
     conversationId: normalized?.conversationId,
     conversationDetails: normalized?.conversationDetails,
     senderDetails: (normalized as any)?.senderDetails || msg.senderDetails,

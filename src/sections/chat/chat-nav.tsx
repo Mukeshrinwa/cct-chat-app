@@ -4,11 +4,13 @@ import { mutate } from 'swr';
 import { useMemo, useState, useEffect, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
+import Badge from '@mui/material/Badge';
 import Stack from '@mui/material/Stack';
 import Drawer from '@mui/material/Drawer';
 import { useTheme } from '@mui/material/styles';
 import TextField from '@mui/material/TextField';
 import IconButton from '@mui/material/IconButton';
+import Typography from '@mui/material/Typography';
 import InputAdornment from '@mui/material/InputAdornment';
 import ClickAwayListener from '@mui/material/ClickAwayListener';
 
@@ -17,7 +19,7 @@ import { useRouter } from 'src/routes/hooks';
 
 import { useResponsive } from 'src/hooks/use-responsive';
 
-import { globalSearch, getMessageContext } from 'src/actions/chat';
+import { globalSearch, getMessageContext, archiveConversation } from 'src/actions/chat';
 
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
@@ -74,6 +76,59 @@ export function ChatNav({
   } = collapseNav;
 
   const [groupCreateOpen, setGroupCreateOpen] = useState(false);
+
+  const [showArchived, setShowArchived] = useState(false);
+
+  const [archivedIds, setArchivedIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('cct_archived_conversations');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    const handleArchiveChange = () => {
+      try {
+        const saved = localStorage.getItem('cct_archived_conversations');
+        setArchivedIds(saved ? JSON.parse(saved) : []);
+      } catch (e) {
+        console.error('Failed to load archived conversations on change:', e);
+      }
+    };
+
+    window.addEventListener('cct_archive_changed', handleArchiveChange);
+    return () => {
+      window.removeEventListener('cct_archive_changed', handleArchiveChange);
+    };
+  }, []);
+
+  const handleArchive = useCallback(async (id: string) => {
+    try {
+      await archiveConversation(id);
+    } catch (err) {
+      console.error('Failed to archive on server:', err);
+    }
+    setArchivedIds((prev) => {
+      const updated = prev.includes(id) ? prev : [...prev, id];
+      localStorage.setItem('cct_archived_conversations', JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  const handleUnarchive = useCallback(async (id: string) => {
+    try {
+      await archiveConversation(id);
+    } catch (err) {
+      console.error('Failed to unarchive on server:', err);
+    }
+    setArchivedIds((prev) => {
+      const updated = prev.filter((item) => item !== id);
+      localStorage.setItem('cct_archived_conversations', JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
 
   // Unique participants from all existing conversations (excluding self)
   const chatContacts = useMemo(() => {
@@ -220,15 +275,23 @@ export function ChatNav({
   const renderList = (
     <nav>
       <Box component="ul">
-        {conversations.allIds.map((conversationId) => (
-          <ChatNavItem
-            key={conversationId}
-            collapse={collapseDesktop}
-            conversation={conversations.byId[conversationId]}
-            selected={conversationId === selectedConversationId}
-            onCloseMobile={onCloseMobile}
-          />
-        ))}
+        {conversations.allIds
+          .filter((conversationId) => {
+            const isIncluded = archivedIds.includes(conversationId);
+            return showArchived ? isIncluded : !isIncluded;
+          })
+          .map((conversationId) => (
+            <ChatNavItem
+              key={conversationId}
+              collapse={collapseDesktop}
+              conversation={conversations.byId[conversationId]}
+              selected={conversationId === selectedConversationId}
+              onCloseMobile={onCloseMobile}
+              isArchived={archivedIds.includes(conversationId)}
+              onArchive={handleArchive}
+              onUnarchive={handleUnarchive}
+            />
+          ))}
       </Box>
     </nav>
   );
@@ -242,6 +305,51 @@ export function ChatNav({
       onClickUser={handleClickResult}
       onClickMessage={handleClickMessage}
     />
+  );
+
+  const renderArchivedHeader = !collapseDesktop && (
+    <Stack direction="row" alignItems="center" spacing={1} sx={{ p: 2, pb: 1 }}>
+      <IconButton onClick={() => setShowArchived(false)}>
+        <Iconify icon="eva:arrow-back-fill" />
+      </IconButton>
+      <Typography variant="subtitle1">Archived Chats</Typography>
+    </Stack>
+  );
+
+  const renderArchivedBar = !collapseDesktop && !searchContacts.query && (
+    <Box
+      onClick={() => setShowArchived(true)}
+      sx={{
+        py: 1.75,
+        px: 2,
+        mx: 1.5,
+        my: 0.5,
+        borderRadius: 1,
+        bgcolor: 'background.neutral',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 2.5,
+        '&:hover': { bgcolor: 'action.hover' },
+      }}
+    >
+      <Iconify icon="solar:archive-down-minimlistic-bold" sx={{ width: 20, height: 20, color: 'text.secondary' }} />
+      <Typography variant="subtitle2" sx={{ color: 'text.primary', flexGrow: 1 }}>
+        Archived Chats
+      </Typography>
+      {archivedIds.length > 0 && (
+        <Badge
+          badgeContent={archivedIds.length}
+          color="primary"
+          sx={{
+            '& .MuiBadge-badge': {
+              position: 'static',
+              transform: 'none',
+            },
+          }}
+        />
+      )}
+    </Box>
   );
 
   const renderSearchInput = (
@@ -264,33 +372,39 @@ export function ChatNav({
   const renderContent = (
     <ClickAwayListener onClickAway={handleClickAwaySearch}>
       <Stack sx={{ height: 1, minHeight: 0 }}>
-        <Stack direction="row" alignItems="center" justifyContent="center" sx={{ p: 2.5, pb: 0 }}>
-          {!collapseDesktop && (
-            <>
-              <ChatNavAccount />
-              <Box sx={{ flexGrow: 1 }} />
-            </>
-          )}
+        {showArchived ? (
+          renderArchivedHeader
+        ) : (
+          <Stack direction="row" alignItems="center" justifyContent="center" sx={{ p: 2.5, pb: 0 }}>
+            {!collapseDesktop && (
+              <>
+                <ChatNavAccount />
+                <Box sx={{ flexGrow: 1 }} />
+              </>
+            )}
 
-          <IconButton onClick={handleToggleNav}>
-            <Iconify
-              icon={collapseDesktop ? 'eva:arrow-ios-forward-fill' : 'eva:arrow-ios-back-fill'}
-            />
-          </IconButton>
+            <IconButton onClick={handleToggleNav}>
+              <Iconify
+                icon={collapseDesktop ? 'eva:arrow-ios-forward-fill' : 'eva:arrow-ios-back-fill'}
+              />
+            </IconButton>
 
-          {!collapseDesktop && (
-            <Stack direction="row" spacing={0.5}>
-              <IconButton onClick={() => setGroupCreateOpen(true)} title="Create Group">
-                <Iconify width={24} icon="solar:users-group-two-rounded-bold" />
-              </IconButton>
-              <IconButton onClick={handleClickCompose} title="New Chat">
-                <Iconify width={24} icon="solar:user-plus-bold" />
-              </IconButton>
-            </Stack>
-          )}
-        </Stack>
+            {!collapseDesktop && (
+              <Stack direction="row" spacing={0.5}>
+                <IconButton onClick={() => setGroupCreateOpen(true)} title="Create Group">
+                  <Iconify width={24} icon="solar:users-group-two-rounded-bold" />
+                </IconButton>
+                <IconButton onClick={handleClickCompose} title="New Chat">
+                  <Iconify width={24} icon="solar:user-plus-bold" />
+                </IconButton>
+              </Stack>
+            )}
+          </Stack>
+        )}
 
-        <Box sx={{ p: 2.5, pt: 0 }}>{!collapseDesktop && renderSearchInput}</Box>
+        <Box sx={{ px: 1.5, pt: 0, pb: 1 }}>{!collapseDesktop && !showArchived && renderSearchInput}</Box>
+
+        {!showArchived && renderArchivedBar}
 
         {loading ? (
           renderLoading

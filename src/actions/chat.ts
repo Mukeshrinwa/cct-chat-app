@@ -491,6 +491,21 @@ export function useGetConversation(conversationId: string) {
 export async function sendMessage(conversationId: string, messageData: IChatMessage) {
   let realConvId = conversationId;
 
+  // Auto-unarchive conversation on sending a message
+  try {
+    const archivedStr = localStorage.getItem('cct_archived_conversations');
+    if (archivedStr) {
+      const archived = JSON.parse(archivedStr);
+      if (Array.isArray(archived) && archived.includes(conversationId)) {
+        const updated = archived.filter((id: string) => id !== conversationId);
+        localStorage.setItem('cct_archived_conversations', JSON.stringify(updated));
+        window.dispatchEvent(new Event('cct_archive_changed'));
+      }
+    }
+  } catch (e) {
+    console.error('Failed to auto-unarchive on sendMessage:', e);
+  }
+
   // 1. Check if conversationId is a recipient user ID
   try {
     const checkRes = await axios.get(`/api/v1/chats/check/${conversationId}`);
@@ -710,6 +725,21 @@ export async function clickConversation(conversationId: string) {
   }
   lastClickedRead[conversationId] = now;
 
+  // Auto-unarchive conversation on click/select
+  try {
+    const archivedStr = localStorage.getItem('cct_archived_conversations');
+    if (archivedStr) {
+      const archived = JSON.parse(archivedStr);
+      if (Array.isArray(archived) && archived.includes(conversationId)) {
+        const updated = archived.filter((id: string) => id !== conversationId);
+        localStorage.setItem('cct_archived_conversations', JSON.stringify(updated));
+        window.dispatchEvent(new Event('cct_archive_changed'));
+      }
+    }
+  } catch (e) {
+    console.error('Failed to auto-unarchive on clickConversation:', e);
+  }
+
   try {
     if (socketService.isConnected()) {
       await socketService.emit('mark_read', { conversationId });
@@ -888,6 +918,62 @@ export async function getMessageContext(conversationId: string, messageId: strin
   const res = await axios.get(`/api/v1/chats/messages/${conversationId}/context/${messageId}`);
   const data = res.data?.data || res.data || [];
   return Array.isArray(data) ? data.map(mapBackendMessageToChatMessage) : [];
+}
+
+// ----------------------------------------------------------------------
+
+export async function muteConversation(conversationId: string) {
+  try {
+    const res = await axios.post(`/api/v1/chats/conversation/${conversationId}/mute`);
+    mutate(`/api/v1/chats/conversations/${conversationId}`);
+    mutate('/api/v1/chats/conversations');
+    return res.data;
+  } catch (error) {
+    console.error('Failed to mute conversation:', error);
+    throw error;
+  }
+}
+
+// ----------------------------------------------------------------------
+
+export async function pinConversation(conversationId: string) {
+  try {
+    const res = await axios.post(`/api/v1/chats/conversation/${conversationId}/pin`);
+    mutate(`/api/v1/chats/conversations/${conversationId}`);
+    mutate('/api/v1/chats/conversations');
+    return res.data;
+  } catch (error) {
+    console.error('Failed to pin conversation:', error);
+    throw error;
+  }
+}
+
+// ----------------------------------------------------------------------
+
+export async function archiveConversation(conversationId: string) {
+  try {
+    const res = await axios.post(`/api/v1/chats/conversation/${conversationId}/archive`);
+    mutate(`/api/v1/chats/conversations/${conversationId}`);
+    mutate('/api/v1/chats/conversations');
+    return res.data;
+  } catch (error) {
+    console.error('Failed to archive conversation:', error);
+    throw error;
+  }
+}
+
+// ----------------------------------------------------------------------
+
+export async function clearChat(conversationId: string) {
+  try {
+    const res = await axios.post(`/api/v1/chats/conversation/${conversationId}/clear`);
+    mutate(`/api/v1/chats/conversations/${conversationId}`);
+    mutate('/api/v1/chats/conversations');
+    return res.data;
+  } catch (error) {
+    console.error('Failed to clear chat:', error);
+    throw error;
+  }
 }
 
 

@@ -1,11 +1,12 @@
 import type { IChatConversation } from 'src/types/chat';
 
-import { useCallback } from 'react';
+import { useState, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
-import Stack from '@mui/material/Stack';
 import Badge from '@mui/material/Badge';
+import Stack from '@mui/material/Stack';
 import Avatar from '@mui/material/Avatar';
+import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 import AvatarGroup from '@mui/material/AvatarGroup';
 import ListItemText from '@mui/material/ListItemText';
@@ -22,6 +23,8 @@ import { useGetGroups } from 'src/actions/group';
 import { clickConversation } from 'src/actions/chat';
 import { useGroupStore } from 'src/store/useGroupStore';
 
+import { Iconify } from 'src/components/iconify';
+
 import { useMockedUser } from 'src/auth/hooks';
 
 import { useNavItem } from './hooks/use-nav-item';
@@ -33,9 +36,21 @@ type Props = {
   collapse: boolean;
   onCloseMobile: () => void;
   conversation: IChatConversation;
+  isArchived?: boolean;
+  onArchive?: (id: string) => void;
+  onUnarchive?: (id: string) => void;
 };
 
-export function ChatNavItem({ selected, collapse, conversation, onCloseMobile }: Props) {
+export function ChatNavItem({ 
+  selected, 
+  collapse, 
+  conversation, 
+  onCloseMobile,
+  isArchived,
+  onArchive,
+  onUnarchive
+}: Props) {
+  const [hovered, setHovered] = useState(false);
   const { user } = useMockedUser();
 
   const mdUp = useResponsive('up', 'md');
@@ -107,6 +122,8 @@ export function ChatNavItem({ selected, collapse, conversation, onCloseMobile }:
     <Box component="li" sx={{ display: 'flex' }}>
       <ListItemButton
         onClick={handleClickConversation}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
         sx={{
           py: 1.5,
           px: 2.5,
@@ -136,25 +153,50 @@ export function ChatNavItem({ selected, collapse, conversation, onCloseMobile }:
               }}
             />
 
-            <Stack alignItems="flex-end" sx={{ alignSelf: 'stretch' }}>
-              <Typography
-                noWrap
-                variant="body2"
-                component="span"
-                sx={{ mb: 1.5, fontSize: 12, color: 'text.disabled' }}
-              >
-                {fToNow(lastActivity)}
-              </Typography>
-
-              {!!conversation.unreadCount && (
-                <Box
-                  sx={{
-                    width: 8,
-                    height: 8,
-                    bgcolor: 'info.main',
-                    borderRadius: '50%',
+            <Stack alignItems="flex-end" sx={{ alignSelf: 'stretch', justifyContent: 'center', minWidth: 40 }}>
+              {hovered ? (
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (isArchived) {
+                      onUnarchive?.(conversation.id);
+                    } else {
+                      onArchive?.(conversation.id);
+                    }
                   }}
-                />
+                  sx={{
+                    bgcolor: 'background.neutral',
+                    '&:hover': { bgcolor: 'action.hover' },
+                  }}
+                >
+                  <Iconify
+                    icon={isArchived ? 'solar:archive-up-minimlistic-bold' : 'solar:archive-down-minimlistic-bold'}
+                    sx={{ width: 18, height: 18 }}
+                  />
+                </IconButton>
+              ) : (
+                <>
+                  <Typography
+                    noWrap
+                    variant="body2"
+                    component="span"
+                    sx={{ mb: 1.5, fontSize: 12, color: 'text.disabled' }}
+                  >
+                    {fToNow(lastActivity)}
+                  </Typography>
+
+                  {!!conversation.unreadCount && (
+                    <Box
+                      sx={{
+                        width: 8,
+                        height: 8,
+                        bgcolor: 'info.main',
+                        borderRadius: '50%',
+                      }}
+                    />
+                  )}
+                </>
               )}
             </Stack>
           </>

@@ -47,6 +47,9 @@ export type IChatConversation = {
   unreadCount: number;
   messages: IChatMessage[];
   participants: IChatParticipant[];
+  isMuted?: boolean;
+  isPinned?: boolean;
+  isArchived?: boolean;
 };
 
 export type IChatConversations = {

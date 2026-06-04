@@ -203,15 +203,33 @@ export function SocketProvider({ children }: SocketProviderProps) {
 
       const loggedInUserId = currentUserId;
 
+      const { conversationId, senderId } = normalized;
+      // Auto-unarchive if a new message is received from someone else
+      if (conversationId && senderId !== loggedInUserId) {
+        try {
+          const archivedStr = localStorage.getItem('cct_archived_conversations');
+          if (archivedStr) {
+            const archived = JSON.parse(archivedStr);
+            if (Array.isArray(archived) && archived.includes(conversationId)) {
+              const updated = archived.filter((id: string) => id !== conversationId);
+              localStorage.setItem('cct_archived_conversations', JSON.stringify(updated));
+              window.dispatchEvent(new Event('cct_archive_changed'));
+            }
+          }
+        } catch (e) {
+          console.error('Failed to auto-unarchive on new message:', e);
+        }
+      }
+
       const activeConvId = useChatStore.getState().activeConversationId;
       const matchingConv = useChatStore
         .getState()
-        .conversations.find((c) => c._id === normalized.conversationId);
+        .conversations.find((c) => c._id === conversationId);
 
       console.log('[NEW_MESSAGE] Socket event:', {
         messageId: normalized.messageId,
-        conversationId: normalized.conversationId,
-        senderId: normalized.senderId,
+        conversationId,
+        senderId,
         loggedInUserId,
         activeConvId,
         foundConv: !!matchingConv,
@@ -221,8 +239,6 @@ export function SocketProvider({ children }: SocketProviderProps) {
       useChatStore
         .getState()
         .updateConversationLastMessage(normalized.conversationId!, normalized, loggedInUserId);
-
-      const { conversationId, senderId } = normalized;
 
       if (conversationId && conversationId === activeConvId && senderId !== currentUserId) {
         // Emit mark_read to socket immediately (bypass clickConversation debounce for instant read ticks)

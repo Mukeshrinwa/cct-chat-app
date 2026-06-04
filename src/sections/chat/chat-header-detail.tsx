@@ -26,7 +26,15 @@ import { useGetGroups } from 'src/actions/group';
 import { useAuthStore } from 'src/store/useAuthStore';
 import { blockUser, unblockUser } from 'src/api/user';
 import { useGroupStore } from 'src/store/useGroupStore';
+import { 
+  clearChat, 
+  pinConversation, 
+  muteConversation, 
+  useGetConversation, 
+  archiveConversation 
+} from 'src/actions/chat';
 
+import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { usePopover, CustomPopover } from 'src/components/custom-popover';
 
@@ -59,6 +67,12 @@ export function ChatHeaderDetail({
   const searchParams = useSearchParams();
   const conversationId = searchParams.get('id') || '';
   const { recordingUsers, typingUsers, onlineUsers } = useSocket();
+
+  const { conversation } = useGetConversation(conversationId);
+
+  const isMuted = conversation?.isMuted || false;
+  const isPinned = conversation?.isPinned || false;
+  const isArchived = conversation?.isArchived || false;
 
   const { user: currentUser, toggleBlockUser } = useAuthStore();
   const [blockLoading, setBlockLoading] = useState(false);
@@ -133,6 +147,68 @@ export function ChatHeaderDetail({
       popover.onClose();
     }
   }, [singleParticipant?.id, isBlocked, blockLoading, toggleBlockUser, popover]);
+
+  const handleMute = useCallback(async () => {
+    try {
+      await muteConversation(conversationId);
+      toast.success(isMuted ? 'Chat unmuted' : 'Chat muted');
+      popover.onClose();
+    } catch (err) {
+      toast.error('Failed to update mute status');
+      console.error(err);
+    }
+  }, [conversationId, isMuted, popover]);
+
+  const handlePin = useCallback(async () => {
+    try {
+      await pinConversation(conversationId);
+      toast.success(isPinned ? 'Chat unpinned' : 'Chat pinned');
+      popover.onClose();
+    } catch (err) {
+      toast.error('Failed to update pin status');
+      console.error(err);
+    }
+  }, [conversationId, isPinned, popover]);
+
+  const handleArchive = useCallback(async () => {
+    try {
+      await archiveConversation(conversationId);
+      
+      // Update local storage for client-side filtering compatibility
+      try {
+        const archivedStr = localStorage.getItem('cct_archived_conversations');
+        let archived = archivedStr ? JSON.parse(archivedStr) : [];
+        if (!Array.isArray(archived)) archived = [];
+        
+        const isCurrentlyArchived = archived.includes(conversationId);
+        const updated = isCurrentlyArchived
+          ? archived.filter((id: string) => id !== conversationId)
+          : [...archived, conversationId];
+          
+        localStorage.setItem('cct_archived_conversations', JSON.stringify(updated));
+        window.dispatchEvent(new Event('cct_archive_changed'));
+      } catch (e) {
+        console.error(e);
+      }
+      
+      toast.success(isArchived ? 'Chat unarchived' : 'Chat archived');
+      popover.onClose();
+    } catch (err) {
+      toast.error('Failed to update archive status');
+      console.error(err);
+    }
+  }, [conversationId, isArchived, popover]);
+
+  const handleClearChat = useCallback(async () => {
+    try {
+      await clearChat(conversationId);
+      toast.success('Chat cleared');
+      popover.onClose();
+    } catch (err) {
+      toast.error('Failed to clear chat');
+      console.error(err);
+    }
+  }, [conversationId, popover]);
 
   const renderGroup = (
     <Stack direction="row" alignItems="center" spacing={2}>
@@ -250,13 +326,19 @@ export function ChatHeaderDetail({
 
       <CustomPopover open={popover.open} anchorEl={popover.anchorEl} onClose={popover.onClose}>
         <MenuList>
-          <MenuItem
-            onClick={() => {
-              popover.onClose();
-            }}
-          >
-            <Iconify icon="solar:bell-off-bold" />
-            Hide notifications
+          <MenuItem onClick={handleMute}>
+            <Iconify icon={isMuted ? "solar:bell-bold" : "solar:bell-off-bold"} />
+            {isMuted ? 'Unmute' : 'Mute'}
+          </MenuItem>
+
+          <MenuItem onClick={handlePin}>
+            <Iconify icon={isPinned ? "solar:pin-slash-bold" : "solar:pin-bold"} />
+            {isPinned ? 'Unpin' : 'Pin'}
+          </MenuItem>
+
+          <MenuItem onClick={handleArchive}>
+            <Iconify icon={isArchived ? "solar:archive-up-minimlistic-bold" : "solar:archive-down-minimlistic-bold"} />
+            {isArchived ? 'Unarchive' : 'Archive'}
           </MenuItem>
 
           <MenuItem
@@ -268,25 +350,14 @@ export function ChatHeaderDetail({
             {blockLoading ? (isBlocked ? 'Unblocking...' : 'Blocking...') : isBlocked ? 'Unblock' : 'Block'}
           </MenuItem>
 
-          <MenuItem
-            onClick={() => {
-              popover.onClose();
-            }}
-          >
-            <Iconify icon="solar:danger-triangle-bold" />
-            Report
-          </MenuItem>
-
           <Divider sx={{ borderStyle: 'dashed' }} />
 
           <MenuItem
-            onClick={() => {
-              popover.onClose();
-            }}
+            onClick={handleClearChat}
             sx={{ color: 'error.main' }}
           >
             <Iconify icon="solar:trash-bin-trash-bold" />
-            Delete
+            Clear Chat
           </MenuItem>
         </MenuList>
       </CustomPopover>

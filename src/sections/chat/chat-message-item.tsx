@@ -42,8 +42,34 @@ type Props = {
   onOpenLightbox: (value: string) => void;
 };
 
+const isSystemMessage = (message: IChatMessage) => {
+  const body = message.body || '';
+  const contentType = message.contentType || '';
+  
+  if (contentType === 'system' || contentType === 'notification') {
+    return true;
+  }
+  
+  const lowerBody = body.toLowerCase();
+  
+  return (
+    lowerBody.includes('created by you') ||
+    lowerBody.includes('created this group') ||
+    (lowerBody.startsWith('group') && lowerBody.includes('created by')) ||
+    (lowerBody.includes('added') && (lowerBody.includes('to the group') || lowerBody.includes('to group'))) ||
+    (lowerBody.includes('removed') && (lowerBody.includes('from the group') || lowerBody.includes('from group'))) ||
+    lowerBody.includes('joined the group') ||
+    lowerBody.includes('left the group') ||
+    lowerBody.includes('changed the group name') ||
+    lowerBody.includes('changed the group icon') ||
+    lowerBody.includes('changed the group description')
+  );
+};
+
 export function ChatMessageItem({ message, participants, onOpenLightbox }: Props) {
   const { user } = useMockedUser();
+  const theme = useTheme();
+
   const searchParams = useSearchParams();
   const conversationId = searchParams.get('id') || '';
   const highlightedMessageId = searchParams.get('messageId') || '';
@@ -95,7 +121,6 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
   // Reactions Popover State
   const [reactionAnchorEl, setReactionAnchorEl] = useState<HTMLButtonElement | null>(null);
 
-  const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [mobileActionsPosition, setMobileActionsPosition] = useState<{ top: number; left: number } | null>(null);
 
@@ -632,6 +657,38 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
       </Stack>
     </Popover>
   );
+
+  const isSystem = isSystemMessage(message);
+
+  if (isSystem) {
+    return (
+      <Stack
+        id={`msg-${message.id}`}
+        direction="row"
+        justifyContent="center"
+        sx={{ mb: 3, width: 1 }}
+      >
+        <Box
+          sx={{
+            py: 0.75,
+            px: 2,
+            borderRadius: 1.5,
+            bgcolor: theme.vars.palette.background.neutral,
+            color: theme.vars.palette.text.secondary,
+            fontSize: '12px',
+            fontWeight: 500,
+            textAlign: 'center',
+            maxWidth: '85%',
+            wordBreak: 'break-word',
+            border: `1px solid ${theme.vars.palette.divider}`,
+            boxShadow: '0px 1px 2px rgba(0, 0, 0, 0.05)',
+          }}
+        >
+          {message.body}
+        </Box>
+      </Stack>
+    );
+  }
 
   return (
     <Stack id={`msg-${message.id}`} direction="row" justifyContent={me ? 'flex-end' : 'unset'} sx={{ mb: 3 }}>

@@ -32,9 +32,9 @@ export function Section({
   method,
   layoutQuery,
   methods,
-  title = 'Manage the job',
-  imgUrl = `${CONFIG.site.basePath}/assets/illustrations/illustration-dashboard.webp`,
-  subtitle = 'More effectively with optimized workflows.',
+title = 'Manage Your Chats',
+  imgUrl = `${CONFIG.site.basePath}/assets/illustrations/illustration-dashboard.png`,
+subtitle = 'Connect with your team and communicate more effectively in real time.',
   ...other
 }: SectionProps) {
   const theme = useTheme();
@@ -107,12 +107,12 @@ export function Section({
                       ...(!selected && { pointerEvents: 'none' }),
                     }}
                   >
-                    <Box
+                    {/* <Box
                       component="img"
                       alt={option.label}
                       src={option.icon}
                       sx={{ width: 32, height: 32 }}
-                    />
+                    /> */}
                   </Link>
                 </Tooltip>
               </Box>

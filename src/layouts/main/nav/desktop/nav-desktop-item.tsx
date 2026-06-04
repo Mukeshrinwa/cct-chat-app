@@ -133,7 +133,7 @@ export function NavItemDashboard({ path, sx, ...other }: NavItemDashboardProps) 
           <Box
             component="img"
             alt="illustration-dashboard"
-            src={`${CONFIG.site.basePath}/assets/illustrations/illustration-dashboard.webp`}
+            src={`${CONFIG.site.basePath}/assets/illustrations/illustration-dashboard.png`}
             sx={{
               width: 640,
               objectFit: 'cover',

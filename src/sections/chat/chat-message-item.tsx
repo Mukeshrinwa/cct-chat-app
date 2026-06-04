@@ -278,6 +278,8 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
         borderRadius: 1,
         typography: 'body2',
         bgcolor: 'background.neutral',
+        wordBreak: 'break-word',
+        whiteSpace: 'pre-wrap',
         ...(me && { color: 'grey.800', bgcolor: 'primary.lighter' }),
         ...(hasImage && { p: 0, bgcolor: 'transparent' }),
         ...(message.isDeleted && {

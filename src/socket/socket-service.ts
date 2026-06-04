@@ -37,19 +37,25 @@ class SocketManager {
     token: string,
     url: string = SOCKET_URL_BASE
   ): Socket {
-    // Reuse existing socket if same token
-    if (this.socket?.connected && this.token === token) return this.socket;
+    // Reuse if same token — whether connected OR still connecting (active)
+    if (this.token === token && this.socket && (this.socket.connected || this.socket.active)) {
+      return this.socket;
+    }
+
+    // Fully tear down only when token actually changed
+    if (this.socket) {
+      // Remove all listeners first so no stale handlers fire during teardown
+      this.socket.removeAllListeners();
+      this.socket.disconnect();
+      this.socket = null;
+    }
 
     this.token = token;
-
-    if (this.socket) {
-      this.socket.disconnect();
-    }
 
     this.socket = io(`${url}/chat`, {
       auth: { token },
       query: { token }, // backward compat
-      transports: ['polling', 'websocket'],
+      transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,

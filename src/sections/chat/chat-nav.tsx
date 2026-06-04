@@ -307,7 +307,7 @@ export function ChatNav({
     />
   );
 
-  const renderArchivedHeader = !collapseDesktop && (
+  const renderArchivedHeader = (!collapseDesktop || !mdUp) && (
     <Stack direction="row" alignItems="center" spacing={1} sx={{ p: 2, pb: 1 }}>
       <IconButton onClick={() => setShowArchived(false)}>
         <Iconify icon="eva:arrow-back-fill" />
@@ -316,7 +316,7 @@ export function ChatNav({
     </Stack>
   );
 
-  const renderArchivedBar = !collapseDesktop && !searchContacts.query && (
+  const renderArchivedBar = (!collapseDesktop || !mdUp) && !searchContacts.query && (
     <Box
       onClick={() => setShowArchived(true)}
       sx={{
@@ -376,20 +376,22 @@ export function ChatNav({
           renderArchivedHeader
         ) : (
           <Stack direction="row" alignItems="center" justifyContent="center" sx={{ p: 2.5, pb: 0 }}>
-            {!collapseDesktop && (
+            {(!collapseDesktop || !mdUp) && (
               <>
                 <ChatNavAccount />
                 <Box sx={{ flexGrow: 1 }} />
               </>
             )}
 
-            <IconButton onClick={handleToggleNav}>
-              <Iconify
-                icon={collapseDesktop ? 'eva:arrow-ios-forward-fill' : 'eva:arrow-ios-back-fill'}
-              />
-            </IconButton>
+            {mdUp && (
+              <IconButton onClick={handleToggleNav}>
+                <Iconify
+                  icon={collapseDesktop ? 'eva:arrow-ios-forward-fill' : 'eva:arrow-ios-back-fill'}
+                />
+              </IconButton>
+            )}
 
-            {!collapseDesktop && (
+            {(!collapseDesktop || !mdUp) && (
               <Stack direction="row" spacing={0.5}>
                 <IconButton onClick={() => setGroupCreateOpen(true)} title="Create Group">
                   <Iconify width={24} icon="solar:users-group-two-rounded-bold" />
@@ -402,7 +404,7 @@ export function ChatNav({
           </Stack>
         )}
 
-        <Box sx={{ px: 1.5, pt: 0, pb: 1 }}>{!collapseDesktop && !showArchived && renderSearchInput}</Box>
+        <Box sx={{ px: 2.5, pt: 0, pb: 1 }}>{(!collapseDesktop || !mdUp) && !showArchived && renderSearchInput}</Box>
 
         {!showArchived && renderArchivedBar}
 

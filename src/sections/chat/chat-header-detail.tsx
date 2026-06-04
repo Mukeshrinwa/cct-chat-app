@@ -14,7 +14,8 @@ import ListItemText from '@mui/material/ListItemText';
 import InputAdornment from '@mui/material/InputAdornment';
 import AvatarGroup, { avatarGroupClasses } from '@mui/material/AvatarGroup';
 
-import { useSearchParams } from 'src/routes/hooks';
+import { paths } from 'src/routes/paths';
+import { useRouter, useSearchParams } from 'src/routes/hooks';
 
 import { useResponsive } from 'src/hooks/use-responsive';
 
@@ -30,6 +31,7 @@ import {
   clearChat, 
   pinConversation, 
   muteConversation, 
+  deleteConversation,
   useGetConversation, 
   archiveConversation 
 } from 'src/actions/chat';
@@ -63,6 +65,8 @@ export function ChatHeaderDetail({
 }: Props) {
   const popover = usePopover();
   const { startCall } = useCall();
+
+  const router = useRouter();
 
   const searchParams = useSearchParams();
   const conversationId = searchParams.get('id') || '';
@@ -209,6 +213,18 @@ export function ChatHeaderDetail({
       console.error(err);
     }
   }, [conversationId, popover]);
+
+  const handleDeleteChat = useCallback(async () => {
+    try {
+      await deleteConversation(conversationId);
+      toast.success('Chat deleted');
+      popover.onClose();
+      router.push(paths.dashboard.chat);
+    } catch (err) {
+      toast.error('Failed to delete chat');
+      console.error(err);
+    }
+  }, [conversationId, popover, router]);
 
   const renderGroup = (
     <Stack direction="row" alignItems="center" spacing={2}>
@@ -358,6 +374,14 @@ export function ChatHeaderDetail({
           >
             <Iconify icon="solar:trash-bin-trash-bold" />
             Clear Chat
+          </MenuItem>
+
+          <MenuItem
+            onClick={handleDeleteChat}
+            sx={{ color: 'error.main' }}
+          >
+            <Iconify icon="solar:trash-bin-trash-bold" />
+            Delete Chat
           </MenuItem>
         </MenuList>
       </CustomPopover>

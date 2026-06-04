@@ -976,4 +976,18 @@ export async function clearChat(conversationId: string) {
   }
 }
 
+// ----------------------------------------------------------------------
+
+export async function deleteConversation(conversationId: string) {
+  try {
+    const res = await axios.delete(`/api/v1/chats/conversation/${conversationId}`);
+    mutate(`/api/v1/chats/conversations/${conversationId}`, null, { revalidate: false });
+    mutate('/api/v1/chats/conversations');
+    return res.data;
+  } catch (error) {
+    console.error('Failed to delete conversation:', error);
+    throw error;
+  }
+}
+
 

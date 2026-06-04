@@ -533,44 +533,46 @@ export function SocketProvider({ children }: SocketProviderProps) {
     });
 
     // -----------------------------------------------------------------------
-    // 12. REACTIONS - message_reaction (real-time for all participants)
+    // 12. REACTIONS - message_reactions (real-time for all participants)
     // -----------------------------------------------------------------------
-    socketInstance.on(
-      'message_reaction',
-      (payload: {
-        messageId: string;
-        conversationId: string;
-        reactions: Array<{ emoji: string; senderId: string; username?: string }>;
-        emoji?: string;
-        senderId?: string;
-      }) => {
-        const convId = payload.conversationId;
-        if (!convId) return;
+    const handleMessageReaction = (payload: {
+      messageId: string;
+      conversationId: string;
+      reactions: Array<{ emoji: string; senderId: string; username?: string }>;
+      emoji?: string;
+      senderId?: string;
+    }) => {
+      const convId = payload.conversationId;
+      if (!convId) return;
 
-        // Patch reactions in SWR cache without a network refetch
-        const key = `/api/v1/chats/conversations/${convId}`;
-        if (cache.get(key)?.data !== undefined) {
-          mutate(
-            key,
-            (current: any) => {
-              if (!current?.conversation?.messages) return current;
-              return {
-                ...current,
-                conversation: {
-                  ...current.conversation,
-                  messages: current.conversation.messages.map((m: any) =>
-                    m.id === payload.messageId
-                      ? { ...m, reactions: payload.reactions }
-                      : m
-                  ),
-                },
-              };
-            },
-            { revalidate: false }
-          );
-        }
+      // Patch reactions in SWR cache without a network refetch
+      const key = `/api/v1/chats/conversations/${convId}`;
+      if (cache.get(key)?.data !== undefined) {
+        mutate(
+          key,
+          (current: any) => {
+            if (!current?.conversation?.messages) return current;
+            return {
+              ...current,
+              conversation: {
+                ...current.conversation,
+                messages: current.conversation.messages.map((m: any) =>
+                  m.id === payload.messageId
+                    ? { ...m, reactions: payload.reactions }
+                    : m
+                ),
+              },
+            };
+          },
+          { revalidate: false }
+        );
       }
-    );
+    };
+
+    socketInstance.on('message_reaction', handleMessageReaction);
+    socketInstance.on('message_reaction_added', handleMessageReaction);
+    socketInstance.on('message_reaction_updated', handleMessageReaction);
+    socketInstance.on('message_reaction_removed', handleMessageReaction);
 
     // -----------------------------------------------------------------------
     // 13. MESSAGES READ - messages_read
@@ -643,7 +645,10 @@ export function SocketProvider({ children }: SocketProviderProps) {
       socketInstance.off('user_unblocked');
       socketInstance.off('disappearing_mode_update');
       socketInstance.off('upload_completed');
-      socketInstance.off('message_reaction');
+      socketInstance.off('message_reaction', handleMessageReaction);
+      socketInstance.off('message_reaction_added', handleMessageReaction);
+      socketInstance.off('message_reaction_updated', handleMessageReaction);
+      socketInstance.off('message_reaction_removed', handleMessageReaction);
       socketInstance.off('messages_read');
       Object.values(typingTimeouts).forEach(clearTimeout);
     };

@@ -320,16 +320,16 @@ export function ChatNav({
     <Box
       onClick={() => setShowArchived(true)}
       sx={{
-        py: 1.75,
+        py: 0.8,
         px: 2,
-        mx: 1.5,
-        my: 0.5,
+        mx: 2.5,
+        my: 0.25,
         borderRadius: 1,
         bgcolor: 'background.neutral',
         cursor: 'pointer',
         display: 'flex',
         alignItems: 'center',
-        gap: 2.5,
+        gap: 1.5,
         '&:hover': { bgcolor: 'action.hover' },
       }}
     >

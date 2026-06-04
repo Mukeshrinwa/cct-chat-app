@@ -39,7 +39,7 @@ export function useNavItem({ currentUserId, conversation }: Props) {
     displayName,
     displayText,
     participants: participantsInConversation,
-    lastActivity: lastMessage.createdAt,
+    lastActivity: lastMessage ? lastMessage.createdAt : new Date(),
     hasOnlineInGroup,
   };
 }

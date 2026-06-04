@@ -132,9 +132,10 @@ export function ChatNavItem({
         }}
       >
         <Badge
-          color="error"
+          color="success"
           overlap="circular"
-          badgeContent={collapse ? conversation.unreadCount : 0}
+          badgeContent={conversation.unreadCount > 0 ? (conversation.unreadCount > 99 ? '99+' : conversation.unreadCount) : 0}
+          max={999}
         >
           {isGroup ? renderGroup : renderSingle}
         </Badge>
@@ -202,12 +203,28 @@ export function ChatNavItem({
                     {!!conversation.unreadCount && (
                       <Box
                         sx={{
-                          width: 8,
-                          height: 8,
-                          bgcolor: 'info.main',
-                          borderRadius: '50%',
+                          minWidth: 18,
+                          height: 18,
+                          px: 0.5,
+                          bgcolor: 'success.main',
+                          borderRadius: 10,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
                         }}
-                      />
+                      >
+                        <Typography
+                          component="span"
+                          sx={{
+                            fontSize: 11,
+                            fontWeight: 700,
+                            color: 'common.white',
+                            lineHeight: 1,
+                          }}
+                        >
+                          {conversation.unreadCount > 99 ? '99+' : conversation.unreadCount}
+                        </Typography>
+                      </Box>
                     )}
                   </Stack>
                 </>

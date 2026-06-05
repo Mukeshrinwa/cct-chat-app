@@ -210,3 +210,62 @@ export async function leaveGroupById(groupId: string) {
     throw error;
   }
 }
+
+// ----------------------------------------------------------------------
+
+export async function promoteToAdmin(groupId: string, userId: string) {
+  try {
+    const res = await axios.patch(`/api/v1/groups/${groupId}/admins/promote`, { userId });
+    mutate('/api/v1/groups');
+    mutate(`/api/v1/groups/${groupId}`);
+    return res.data;
+  } catch (error) {
+    console.error('Failed to promote member to admin:', error);
+    throw error;
+  }
+}
+
+// ----------------------------------------------------------------------
+
+export async function demoteFromAdmin(groupId: string, userId: string) {
+  try {
+    const res = await axios.patch(`/api/v1/groups/${groupId}/admins/demote`, { memberId: userId });
+    mutate('/api/v1/groups');
+    mutate(`/api/v1/groups/${groupId}`);
+    return res.data;
+  } catch (error) {
+    console.error('Failed to demote admin:', error);
+    throw error;
+  }
+}
+
+// ----------------------------------------------------------------------
+
+export async function generateGroupInviteLink(groupId: string) {
+  try {
+    const res = await axios.post(`/api/v1/groups/${groupId}/invite-link`);
+    mutate('/api/v1/groups');
+    mutate(`/api/v1/groups/${groupId}`);
+    return res.data;
+  } catch (error) {
+    console.error('Failed to generate invite link:', error);
+    throw error;
+  }
+}
+
+// ----------------------------------------------------------------------
+
+export async function updateDisappearingMessages(groupId: string, mode: string) {
+  try {
+    const res = await axios.patch(`/api/v1/groups/${groupId}`, {
+      disappearingMode: mode,
+    });
+    mutate('/api/v1/groups');
+    mutate(`/api/v1/groups/${groupId}`);
+    return res.data;
+  } catch (error) {
+    console.error('Failed to update disappearing messages:', error);
+    throw error;
+  }
+}
+

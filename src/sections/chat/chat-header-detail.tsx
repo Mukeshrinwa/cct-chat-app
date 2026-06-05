@@ -331,7 +331,7 @@ export function ChatHeaderDetail({
           <Iconify icon="solar:videocamera-record-bold" />
         </IconButton>
 
-        <IconButton onClick={handleToggleNav} sx={{ display: { xs: 'none', md: 'inline-flex' } }}>
+        <IconButton onClick={handleToggleNav}>
           <Iconify icon={!collapseDesktop ? 'ri:sidebar-unfold-fill' : 'ri:sidebar-fold-fill'} />
         </IconButton>
 

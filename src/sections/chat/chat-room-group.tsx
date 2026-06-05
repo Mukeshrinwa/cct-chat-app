@@ -16,7 +16,6 @@ import TextField from '@mui/material/TextField';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 import DialogTitle from '@mui/material/DialogTitle';
-import ListItemText from '@mui/material/ListItemText';
 import Autocomplete from '@mui/material/Autocomplete';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
@@ -77,6 +76,44 @@ export function ChatRoomGroup({ participants, isUserMember = true }: Props) {
   // groupId: prefer explicit _id, fallback to conversationId so add_members still works
   const groupId = currentGroup?._id || currentGroup?.id || selectedConversationId;
 
+  // ── Derive "In room" participants directly from group API data ──────────
+  // Group API returns full user objects in members[] + admins[].
+  // We merge them (dedup by id) so the list is always up-to-date without refresh.
+  const groupParticipants: IChatParticipant[] = (() => {
+    if (!currentGroup) return participants; // fallback while group data loads
+
+    const mapGroupUser = (u: any): IChatParticipant => ({
+      id: u.id || u._id || '',
+      name: u.name || u.displayName || 'User',
+      username: u.username || '',
+      role: u.role || 'user',
+      email: u.email || '',
+      address: u.address || '',
+      avatarUrl: u.avatar || u.avatarUrl || u.photoURL || '',
+      phoneNumber: u.phoneNumber || '',
+      lastActivity: u.lastActivity || new Date().toISOString(),
+      status: (u.status as any) || 'offline',
+    });
+
+    const seen = new Set<string>();
+    const result: IChatParticipant[] = [];
+
+    const addUnique = (u: any) => {
+      const id = u.id || u._id || '';
+      if (id && !seen.has(id)) {
+        seen.add(id);
+        result.push(mapGroupUser(u));
+      }
+    };
+
+    // admins first, then remaining members
+    (currentGroup.admins || []).forEach(addUnique);
+    (currentGroup.members || []).forEach(addUnique);
+
+    return result.length > 0 ? result : participants;
+  })();
+  // ────────────────────────────────────────────────────────────────────────
+
   const collapse = useBoolean(true);
   const [selected, setSelected] = useState<IChatParticipant | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -91,7 +128,7 @@ export function ChatRoomGroup({ participants, isUserMember = true }: Props) {
   const [memberToRemove, setMemberToRemove] = useState<IChatParticipant | null>(null);
   const confirmLeave = useBoolean();
 
-  const existingParticipantIds = new Set(participants.map((participant) => participant.id));
+  const existingParticipantIds = new Set(groupParticipants.map((participant) => participant.id));
 
   const addableContacts = contacts.filter(
     (contact) => !existingParticipantIds.has(contact.id) && contact.id !== user?.id
@@ -241,7 +278,7 @@ export function ChatRoomGroup({ participants, isUserMember = true }: Props) {
     }
   }, [groupId, router, confirmLeave]);
 
-  const totalParticipants = participants.length;
+  const totalParticipants = groupParticipants.length;
 
   const renderGroupInfo = (
     <Stack alignItems="center" sx={{ py: 3, px: 2, position: 'relative', width: '100%' }}>
@@ -294,7 +331,7 @@ export function ChatRoomGroup({ participants, isUserMember = true }: Props) {
 
       {/* Member count badge */}
       <Typography variant="caption" sx={{ color: 'text.disabled', mt: 0.5 }}>
-        {participants.length} member{participants.length !== 1 ? 's' : ''}
+        {groupParticipants.length} member{groupParticipants.length !== 1 ? 's' : ''}
       </Typography>
 
       {/* Action buttons — icon-only with tooltip to prevent overflow */}
@@ -355,44 +392,111 @@ export function ChatRoomGroup({ participants, isUserMember = true }: Props) {
   );
 
 
+  // Derive owner id and admin ids from currentGroup
+  const ownerId: string = currentGroup?.owner?.id || currentGroup?.owner?._id || currentGroup?.owner || '';
+  const adminIds = new Set<string>(
+    (currentGroup?.admins || []).map((a: any) => a.id || a._id || a)
+  );
+
   const renderList = (
     <>
-      {participants.map((participant) => (
-        <Box key={participant.id} sx={{ display: 'flex', alignItems: 'center' }}>
-          <ListItemButton sx={{ flexGrow: 1, minWidth: 0 }} onClick={() => handleOpen(participant)}>
-            <Badge
-              variant={participant.status}
-              anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-            >
-              <Avatar alt={participant.name} src={participant.avatarUrl} />
-            </Badge>
+      {groupParticipants.map((participant) => {
+        const isOwner = !!ownerId && participant.id === ownerId;
+        const isAdmin = !isOwner && adminIds.has(participant.id);
 
-            <ListItemText
-              sx={{ ml: 2 }}
-              primary={participant.name}
-              secondary={participant.role}
-              primaryTypographyProps={{ noWrap: true, typography: 'subtitle2' }}
-              secondaryTypographyProps={{ noWrap: true, component: 'span', typography: 'caption' }}
-            />
-          </ListItemButton>
+        return (
+          <Box key={participant.id} sx={{ display: 'flex', alignItems: 'center' }}>
+            <ListItemButton sx={{ flexGrow: 1, minWidth: 0 }} onClick={() => handleOpen(participant)}>
+              <Badge
+                variant={participant.status}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+              >
+                <Avatar alt={participant.name} src={participant.avatarUrl} />
+              </Badge>
 
-          {isUserMember && participant.id !== user?.id && (
-            <IconButton
-              size="small"
-              color="error"
-              disabled={removingMemberId === participant.id}
-              onClick={(event) => {
-                event.stopPropagation();
-                handleRemoveMember(participant);
-              }}
-              sx={{ mr: 1 }}
-              title="Remove member"
-            >
-              <Iconify icon="solar:user-minus-bold" width={18} />
-            </IconButton>
-          )}
-        </Box>
-      ))}
+              <Box sx={{ ml: 2, minWidth: 0, flex: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, minWidth: 0 }}>
+                  <Typography
+                    variant="subtitle2"
+                    noWrap
+                    sx={{ maxWidth: isOwner || isAdmin ? 'calc(100% - 64px)' : '100%' }}
+                  >
+                    {participant.name}
+                  </Typography>
+
+                  {isOwner && (
+                    <Box
+                      component="span"
+                      sx={{
+                        flexShrink: 0,
+                        fontSize: 10,
+                        fontWeight: 700,
+                        lineHeight: 1,
+                        px: 0.75,
+                        py: 0.35,
+                        borderRadius: 0.75,
+                        bgcolor: 'warning.soft',
+                        color: 'warning.dark',
+                        border: '1px solid',
+                        borderColor: 'warning.light',
+                        textTransform: 'uppercase',
+                        letterSpacing: 0.4,
+                      }}
+                    >
+                      Owner
+                    </Box>
+                  )}
+
+                  {isAdmin && (
+                    <Box
+                      component="span"
+                      sx={{
+                        flexShrink: 0,
+                        fontSize: 10,
+                        fontWeight: 700,
+                        lineHeight: 1,
+                        px: 0.75,
+                        py: 0.35,
+                        borderRadius: 0.75,
+                        bgcolor: 'info.soft',
+                        color: 'info.dark',
+                        border: '1px solid',
+                        borderColor: 'info.light',
+                        textTransform: 'uppercase',
+                        letterSpacing: 0.4,
+                      }}
+                    >
+                      Admin
+                    </Box>
+                  )}
+                </Box>
+
+                <Typography variant="caption" noWrap sx={{ color: 'text.secondary', display: 'block' }}>
+                  {participant.username ? `@${participant.username}` : participant.role}
+                </Typography>
+              </Box>
+            </ListItemButton>
+
+            {isUserMember &&
+              participant.id !== user?.id &&
+              (user?.id === ownerId || adminIds.has(user?.id ?? '')) && (
+              <IconButton
+                size="small"
+                color="error"
+                disabled={removingMemberId === participant.id}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  handleRemoveMember(participant);
+                }}
+                sx={{ mr: 1 }}
+                title="Remove member"
+              >
+                <Iconify icon="solar:user-minus-bold" width={18} />
+              </IconButton>
+            )}
+          </Box>
+        );
+      })}
     </>
   );
 

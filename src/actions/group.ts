@@ -179,7 +179,9 @@ export async function addMembersToGroup(groupId: string, members: string[]) {
 
 export async function removeMemberFromGroup(groupId: string, memberId: string) {
   try {
-    const res = await axios.post(`/api/v1/groups/${groupId}/remove-member`, { memberId });
+    const res = await axios.delete(`/api/v1/groups/${groupId}/members`, {
+      data: { userId: memberId },
+    });
 
     mutate('/api/v1/groups');
     mutate(`/api/v1/groups/${groupId}`);

@@ -255,13 +255,42 @@ export async function generateGroupInviteLink(groupId: string) {
 
 // ----------------------------------------------------------------------
 
-export async function updateDisappearingMessages(groupId: string, mode: string) {
+export async function updateDisappearingMessages(conversationId: string, mode: string) {
   try {
-    const res = await axios.patch(`/api/v1/groups/${groupId}`, {
-      disappearingMode: mode,
+    const res = await axios.post('/api/v1/chats/disappearing', {
+      conversationId,
+      mode,
     });
-    mutate('/api/v1/groups');
-    mutate(`/api/v1/groups/${groupId}`);
+
+    // Optimistically update the groups list cache so group.conversationId.disappearingMode
+    // is correct the next time the dialog opens (without needing a full re-fetch).
+    // Per the API response, disappearingMode lives inside the nested conversationId object.
+    mutate(
+      '/api/v1/groups',
+      (current: any) => {
+        if (!current?.data) return current;
+        return {
+          ...current,
+          data: current.data.map((g: any) => {
+            const gConvId = g.conversationId?._id || g.conversationId;
+            if (gConvId === conversationId) {
+              return {
+                ...g,
+                conversationId: {
+                  ...g.conversationId,
+                  disappearingMode: mode,
+                },
+              };
+            }
+            return g;
+          }),
+        };
+      },
+      { revalidate: false }
+    );
+
+    mutate('/api/v1/chats/conversations');
+    mutate(`/api/v1/chats/conversations/${conversationId}`);
     return res.data;
   } catch (error) {
     console.error('Failed to update disappearing messages:', error);

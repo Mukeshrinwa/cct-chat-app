@@ -128,7 +128,11 @@ export function ChatGroupEditDialog({ open, onClose, group }: Props) {
       setGroupAvatarPreview(group.groupAvatar || '');
       setOnlyAdminsCanMessage(group.permissions?.onlyAdminsCanMessage ?? false);
       setOnlyAdminsCanEditInfo(group.permissions?.onlyAdminsCanEditInfo ?? false);
-      setDisappearingMode(group.disappearingMode || 'off');
+      // Always sync disappearingMode from the group — after a successful save
+      // the optimistic SWR patch in updateDisappearingMessages ensures group.disappearingMode
+      // already reflects the new value, so this is always correct.
+      // disappearingMode lives on the nested conversationId object per the API response
+      setDisappearingMode(group.conversationId?.disappearingMode || group.disappearingMode || 'off');
       setInviteLink(group.inviteLink || '');
       setActiveTab(0);
     }
@@ -192,8 +196,14 @@ export function ChatGroupEditDialog({ open, onClose, group }: Props) {
   }, [inviteLink]);
 
   const handleDisappearingSave = async (mode: string) => {
+    // The backend endpoint requires a conversationId, not the group _id.
+    // group.conversationId may be a populated object or a plain string ID.
+    const conversationId =
+      group.conversationId?._id ||
+      group.conversationId ||
+      group._id;
     try {
-      await updateDisappearingMessages(group._id, mode);
+      await updateDisappearingMessages(conversationId, mode);
       setDisappearingMode(mode);
       toast.success('Disappearing messages updated');
     } catch {

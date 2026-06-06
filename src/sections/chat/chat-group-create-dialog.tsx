@@ -35,9 +35,10 @@ type Props = {
   open: boolean;
   onClose: () => void;
   chatContacts: IChatParticipant[];
+  preSelectedIds?: string[]; // pre-check specific contacts when opening
 };
 
-export function ChatGroupCreateDialog({ open, onClose, chatContacts }: Props) {
+export function ChatGroupCreateDialog({ open, onClose, chatContacts, preSelectedIds = [] }: Props) {
   const router = useRouter();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -79,26 +80,29 @@ export function ChatGroupCreateDialog({ open, onClose, chatContacts }: Props) {
     }
   };
 
-  // Reset fields on close
+  // Reset fields on close / seed pre-selected on open
   useEffect(() => {
-    if (!open) {
+    if (open) {
       setGroupName('');
       setGroupAvatar('');
       setAvatarPreview('');
       setSearchQuery('');
-      setSelectedIds([]);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    }
-  }, [open]);
+      setSelectedIds(preSelectedIds.length > 0 ? preSelectedIds : []);
+    } else if (fileInputRef.current) fileInputRef.current.value = '';
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Filter from chatContacts (users we've already talked to)
-  const filteredUsers = chatContacts.filter(
-    (c) =>
-      c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (c.username || '').toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Only show results when user is actively searching
+  const hasQuery = searchQuery.trim().length > 0;
+  const filteredUsers = hasQuery
+    ? chatContacts.filter(
+        (c) =>
+          c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (c.username || '').toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : [];
+
+  // Always keep the selected contacts available for chip display
+  const selectedContacts = chatContacts.filter((c) => selectedIds.includes(c.id));
 
   const handleSelect = (id: string) => {
     setSelectedIds((prev) =>
@@ -233,10 +237,45 @@ export function ChatGroupCreateDialog({ open, onClose, chatContacts }: Props) {
             Select participants
           </Typography>
 
+          {/* Selected chips — always visible so user tracks their picks */}
+          {selectedContacts.length > 0 && (
+            <Stack direction="row" flexWrap="wrap" gap={0.75}>
+              {selectedContacts.map((c) => (
+                <Stack
+                  key={c.id}
+                  direction="row"
+                  alignItems="center"
+                  spacing={0.5}
+                  sx={{
+                    px: 1,
+                    py: 0.4,
+                    borderRadius: 5,
+                    bgcolor: 'primary.soft',
+                    border: '1px solid',
+                    borderColor: 'primary.light',
+                  }}
+                >
+                  <Avatar src={c.avatarUrl} alt={c.name} sx={{ width: 18, height: 18, fontSize: 10 }} />
+                  <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 600, maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {c.name}
+                  </Typography>
+                  <Box
+                    component="span"
+                    onClick={() => handleSelect(c.id)}
+                    sx={{ cursor: 'pointer', color: 'primary.main', display: 'flex', ml: 0.25 }}
+                  >
+                    <Iconify icon="mingcute:close-line" width={12} />
+                  </Box>
+                </Stack>
+              ))}
+            </Stack>
+          )}
+
           <TextField
             fullWidth
+            autoComplete="off"
             size="small"
-            placeholder="Search contacts..."
+            placeholder="Type a name to search contacts..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             InputProps={{
@@ -245,18 +284,44 @@ export function ChatGroupCreateDialog({ open, onClose, chatContacts }: Props) {
                   <Iconify icon="eva:search-fill" width={18} sx={{ color: 'text.disabled' }} />
                 </InputAdornment>
               ),
+              endAdornment: searchQuery ? (
+                <InputAdornment position="end">
+                  <IconButton size="small" onClick={() => setSearchQuery('')}>
+                    <Iconify icon="mingcute:close-line" width={14} />
+                  </IconButton>
+                </InputAdornment>
+              ) : null,
             }}
           />
         </Stack>
 
         <List sx={{ px: 2, maxHeight: 240, overflow: 'auto', minHeight: 120 }}>
-          {filteredUsers.length === 0 ? (
+          {/* Empty state — before user types anything */}
+          {!hasQuery && (
+            <Stack sx={{ py: 4 }} alignItems="center" justifyContent="center" spacing={1}>
+              <Iconify icon="eva:search-fill" width={32} sx={{ color: 'text.disabled' }} />
+              <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+                Type a name to find contacts
+              </Typography>
+              {selectedIds.length > 0 && (
+                <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 600 }}>
+                  {selectedIds.length} selected
+                </Typography>
+              )}
+            </Stack>
+          )}
+
+          {/* No results after searching */}
+          {hasQuery && filteredUsers.length === 0 && (
             <Stack sx={{ py: 4 }} alignItems="center" justifyContent="center">
               <Typography variant="body2" sx={{ color: 'text.secondary' }}>
-                {chatContacts.length === 0 ? 'Abhi tak kisi se chat nahi ki' : 'No contacts found'}
+                No contacts found for &ldquo;{searchQuery}&rdquo;
               </Typography>
             </Stack>
-          ) : (
+          )}
+
+          {/* Search results */}
+          {hasQuery &&
             filteredUsers.map((contact) => {
               const selected = selectedIds.includes(contact.id);
               return (
@@ -268,6 +333,7 @@ export function ChatGroupCreateDialog({ open, onClose, chatContacts }: Props) {
                     mb: 0.5,
                     px: 1.5,
                     py: 0.8,
+                    bgcolor: selected ? 'primary.soft' : 'transparent',
                   }}
                 >
                   <Avatar alt={contact.name} src={contact.avatarUrl} sx={{ width: 36, height: 36 }} />
@@ -281,8 +347,7 @@ export function ChatGroupCreateDialog({ open, onClose, chatContacts }: Props) {
                   <Checkbox checked={selected} color="primary" size="small" />
                 </ListItemButton>
               );
-            })
-          )}
+            })}
         </List>
       </DialogContent>
 

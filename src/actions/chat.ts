@@ -996,4 +996,31 @@ export async function deleteConversation(conversationId: string) {
   }
 }
 
+// ----------------------------------------------------------------------
 
+export async function setConversationDisappearingMode(conversationId: string, mode: string) {
+  try {
+    const res = await axios.post('/api/v1/chats/disappearing', { conversationId, mode });
+
+    // Optimistically patch the conversations list cache
+    mutate(
+      '/api/v1/chats/conversations',
+      (current: any) => {
+        if (!current?.data) return current;
+        return {
+          ...current,
+          data: current.data.map((c: any) =>
+            c._id === conversationId ? { ...c, disappearingMode: mode } : c
+          ),
+        };
+      },
+      { revalidate: false }
+    );
+
+    mutate(`/api/v1/chats/conversations/${conversationId}`);
+    return res.data;
+  } catch (error) {
+    console.error('Failed to set disappearing mode:', error);
+    throw error;
+  }
+}

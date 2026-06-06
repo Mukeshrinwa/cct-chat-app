@@ -639,15 +639,42 @@ export function SocketProvider({ children }: SocketProviderProps) {
     // -----------------------------------------------------------------------
     socketInstance.on(
       'disappearing_mode_update',
-      (payload: { conversationId: string; mode: string; updatedBy: string }) => {
+      (payload: { conversationId: string; mode: string; updatedBy: any }) => {
         const key = `/api/v1/chats/conversations/${payload.conversationId}`;
         if (cache.get(key)?.data !== undefined) {
           mutate(key);
         }
+        // Also refresh the conversations list so disappearingMode badge updates
+        mutate('/api/v1/chats/conversations');
+
         useChatStore
           .getState()
           .updateConversationDisappearingMode(payload.conversationId, payload.mode);
-        toast.info(`Disappearing messages changed to ${payload.mode} by ${payload.updatedBy}`);
+
+        // Resolve the updater name — backend may send an id, object, or nothing
+        const updaterName: string =
+          (typeof payload.updatedBy === 'object' && payload.updatedBy !== null
+            ? payload.updatedBy.name || payload.updatedBy.username
+            : typeof payload.updatedBy === 'string' && payload.updatedBy.length < 40
+              ? payload.updatedBy   // short string → likely a name
+              : null) || 'Someone';
+
+        // Skip toast for the user who made the change (they already got a success toast)
+        const isMe = payload.updatedBy === currentUserId ||
+          (typeof payload.updatedBy === 'object' && payload.updatedBy !== null &&
+            (payload.updatedBy._id === currentUserId || payload.updatedBy.id === currentUserId));
+        if (isMe) return;
+
+        const MODE_LABELS: Record<string, string> = {
+          off: 'Off',
+          '24h': '24 Hours',
+          '7d': '7 Days',
+          '30d': '30 Days',
+          '90d': '90 Days',
+        };
+        const modeLabel = (payload.mode && MODE_LABELS[payload.mode]) || payload.mode || 'Unknown';
+
+        toast.info(`${updaterName} set disappearing messages to ${modeLabel}`);
       }
     );
 

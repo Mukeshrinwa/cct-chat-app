@@ -32,7 +32,11 @@ import {
   useGetGroups,
   leaveGroupById,
   addMembersToGroup,
+  rejectJoinRequest,
+  useGetJoinRequests,
+  approveJoinRequest,
   removeMemberFromGroup,
+  bulkHandleJoinRequests,
 } from 'src/actions/group';
 
 import { Iconify } from 'src/components/iconify';
@@ -127,6 +131,11 @@ export function ChatRoomGroup({ participants, isUserMember = true }: Props) {
   const confirmRemove = useBoolean();
   const [memberToRemove, setMemberToRemove] = useState<IChatParticipant | null>(null);
   const confirmLeave = useBoolean();
+  const requestsCollapse = useBoolean(true);
+
+  const [approving, setApproving] = useState<string | null>(null);
+  const [rejecting, setRejecting] = useState<string | null>(null);
+  const [bulkActioning, setBulkActioning] = useState<'approve' | 'reject' | null>(null);
 
   const existingParticipantIds = new Set(groupParticipants.map((participant) => participant.id));
 
@@ -279,6 +288,46 @@ export function ChatRoomGroup({ participants, isUserMember = true }: Props) {
   }, [groupId, router, confirmLeave]);
 
   const totalParticipants = groupParticipants.length;
+
+  const actualGroupId = currentGroup?._id || currentGroup?.id || '';
+  const { requests } = useGetJoinRequests(actualGroupId);
+
+  const handleApproveRequest = async (reqId: string) => {
+    try {
+      setApproving(reqId);
+      await approveJoinRequest(groupId, reqId);
+      toast.success('Request approved');
+    } catch {
+      toast.error('Failed to approve request');
+    } finally {
+      setApproving(null);
+    }
+  };
+
+  const handleRejectRequest = async (reqId: string) => {
+    try {
+      setRejecting(reqId);
+      await rejectJoinRequest(groupId, reqId);
+      toast.success('Request rejected');
+    } catch {
+      toast.error('Failed to reject request');
+    } finally {
+      setRejecting(null);
+    }
+  };
+
+  const handleBulkRequests = async (action: 'approve' | 'reject') => {
+    try {
+      setBulkActioning(action);
+      const reqIds = requests.map((req: any) => req._id || req.id);
+      await bulkHandleJoinRequests(groupId, action, reqIds);
+      toast.success(`All requests ${action}d`);
+    } catch {
+      toast.error(`Failed to bulk ${action} requests`);
+    } finally {
+      setBulkActioning(null);
+    }
+  };
 
   const renderGroupInfo = (
     <Stack alignItems="center" sx={{ py: 3, px: 2, position: 'relative', width: '100%' }}>
@@ -500,6 +549,77 @@ export function ChatRoomGroup({ participants, isUserMember = true }: Props) {
     </>
   );
 
+  const userId = user?.id || (user as any)?._id || '';
+  const isAdminOrOwner = !!userId && (userId === ownerId || adminIds.has(userId));
+
+  const renderRequestsList = (
+    <Box sx={{ mt: 1 }}>
+      {requests.length > 1 && (
+        <Stack direction="row" spacing={1} sx={{ px: 2, mb: 1, justifyContent: 'flex-end' }}>
+          <Button
+            size="small"
+            color="error"
+            variant="soft"
+            disabled={!!bulkActioning}
+            onClick={() => handleBulkRequests('reject')}
+            sx={{ fontSize: 11, py: 0.25, px: 1 }}
+          >
+            {bulkActioning === 'reject' ? 'Rejecting...' : 'Reject All'}
+          </Button>
+          <Button
+            size="small"
+            color="primary"
+            variant="soft"
+            disabled={!!bulkActioning}
+            onClick={() => handleBulkRequests('approve')}
+            sx={{ fontSize: 11, py: 0.25, px: 1 }}
+          >
+            {bulkActioning === 'approve' ? 'Approving...' : 'Approve All'}
+          </Button>
+        </Stack>
+      )}
+
+      {requests.map((req: any) => {
+        const reqId = req._id || req.id;
+        const u = req.userId || req.user || {};
+        const isApproving = approving === reqId || bulkActioning === 'approve';
+        const isRejecting = rejecting === reqId || bulkActioning === 'reject';
+        
+        return (
+          <Box key={reqId} sx={{ display: 'flex', alignItems: 'center', py: 1, px: 2 }}>
+            <Avatar src={u.avatar || u.avatarUrl || ''} alt={u.name} sx={{ width: 36, height: 36, mr: 1.5 }} />
+            <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+              <Typography variant="subtitle2" noWrap>{u.name || 'Unknown User'}</Typography>
+              <Typography variant="caption" noWrap sx={{ color: 'text.secondary' }}>
+                {u.username ? `@${u.username}` : ''}
+              </Typography>
+            </Box>
+            <Stack direction="row" spacing={0.5} sx={{ ml: 1 }}>
+              <IconButton
+                size="small"
+                color="primary"
+                disabled={isRejecting || isApproving}
+                onClick={() => handleApproveRequest(reqId)}
+                sx={{ bgcolor: 'primary.soft', '&:hover': { bgcolor: 'primary.main', color: 'primary.contrastText' } }}
+              >
+                <Iconify icon="solar:check-circle-bold" width={20} />
+              </IconButton>
+              <IconButton
+                size="small"
+                color="error"
+                disabled={isRejecting || isApproving}
+                onClick={() => handleRejectRequest(reqId)}
+                sx={{ bgcolor: 'error.soft', '&:hover': { bgcolor: 'error.main', color: 'error.contrastText' } }}
+              >
+                <Iconify icon="solar:close-circle-bold" width={20} />
+              </IconButton>
+            </Stack>
+          </Box>
+        );
+      })}
+    </Box>
+  );
+
   return (
     <>
       {renderGroupInfo}
@@ -513,6 +633,19 @@ export function ChatRoomGroup({ participants, isUserMember = true }: Props) {
       </CollapseButton>
 
       <Collapse in={collapse.value}>{renderList}</Collapse>
+
+      {isAdminOrOwner && requests?.length > 0 && (
+        <>
+          <CollapseButton
+            selected={requestsCollapse.value}
+            onClick={requestsCollapse.onToggle}
+            sx={{ mt: 2 }}
+          >
+            {`Requests (${requests.length})`}
+          </CollapseButton>
+          <Collapse in={requestsCollapse.value}>{renderRequestsList}</Collapse>
+        </>
+      )}
 
       {selected && (
         <ChatRoomParticipantDialog participant={selected} open={!!selected} onClose={handleClose} />

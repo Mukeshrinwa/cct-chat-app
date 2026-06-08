@@ -36,9 +36,6 @@ import {
   updateGroup,
   promoteToAdmin,
   demoteFromAdmin,
-  rejectJoinRequest,
-  approveJoinRequest,
-  useGetJoinRequests,
   generateGroupInviteLink,
   updateDisappearingMessages,
 } from 'src/actions/group';
@@ -95,11 +92,6 @@ export function ChatGroupEditDialog({ open, onClose, group }: Props) {
 
   // ── Share Invite ───────────────────────────────────────────────────
   const [shareOpen, setShareOpen] = useState(false);
-
-  // ── Join Requests ───────────────────────────────────────────────────
-  const { requests, requestsLoading } = useGetJoinRequests(group?._id);
-  const [approving, setApproving] = useState<string | null>(null);
-  const [rejecting, setRejecting] = useState<string | null>(null);
 
   // ── Save / Delete ──────────────────────────────────────────────────
   const [saving, setSaving] = useState(false);
@@ -161,30 +153,6 @@ export function ChatGroupEditDialog({ open, onClose, group }: Props) {
   }, [group, open]);
 
   // ── Handlers ────────────────────────────────────────────────────────
-
-  const handleApproveRequest = async (reqId: string) => {
-    try {
-      setApproving(reqId);
-      await approveJoinRequest(group._id, reqId);
-      toast.success('Request approved');
-    } catch {
-      toast.error('Failed to approve request');
-    } finally {
-      setApproving(null);
-    }
-  };
-
-  const handleRejectRequest = async (reqId: string) => {
-    try {
-      setRejecting(reqId);
-      await rejectJoinRequest(group._id, reqId);
-      toast.success('Request rejected');
-    } catch {
-      toast.error('Failed to reject request');
-    } finally {
-      setRejecting(null);
-    }
-  };
 
   const handleSave = async () => {
     if (!groupName.trim()) { toast.error('Group name is required'); return; }
@@ -691,61 +659,6 @@ export function ChatGroupEditDialog({ open, onClose, group }: Props) {
       })}
     </Stack>
   );
-
-  const renderRequestsTab = (
-    <Stack spacing={1.5}>
-      {requestsLoading ? (
-        <Stack alignItems="center" sx={{ py: 3 }}><CircularProgress size={24} /></Stack>
-      ) : !requests || requests.length === 0 ? (
-        <Alert severity="info">No pending join requests.</Alert>
-      ) : (
-        <List disablePadding>
-          {requests.map((req: any) => {
-            const reqId = req._id || req.id;
-            const u = req.userId || req.user || {};
-            const isApproving = approving === reqId;
-            const isRejecting = rejecting === reqId;
-            return (
-              <Box key={reqId}>
-                <ListItemButton disableRipple sx={{ px: 1, py: 1, borderRadius: 1.5, '&:hover': { bgcolor: 'transparent' } }}>
-                  <Avatar src={u.avatar || u.avatarUrl || ''} alt={u.name} sx={{ width: 38, height: 38, mr: 1.5 }} />
-                  <ListItemText
-                    primary={<Typography variant="subtitle2" noWrap>{u.name || 'Unknown User'}</Typography>}
-                    secondary={`@${u.username || ''}`}
-                    secondaryTypographyProps={{ noWrap: true, typography: 'caption' }}
-                  />
-                  <Stack direction="row" spacing={1}>
-                    <LoadingButton
-                      size="small"
-                      color="error"
-                      variant="outlined"
-                      loading={isRejecting}
-                      disabled={isApproving}
-                      onClick={() => handleRejectRequest(reqId)}
-                    >
-                      Reject
-                    </LoadingButton>
-                    <LoadingButton
-                      size="small"
-                      color="primary"
-                      variant="contained"
-                      loading={isApproving}
-                      disabled={isRejecting}
-                      onClick={() => handleApproveRequest(reqId)}
-                    >
-                      Approve
-                    </LoadingButton>
-                  </Stack>
-                </ListItemButton>
-                <Divider sx={{ mx: 1 }} />
-              </Box>
-            );
-          })}
-        </List>
-      )}
-    </Stack>
-  );
-
   const TABS = [
     { label: 'General', icon: 'solar:settings-bold', content: renderGeneralTab },
     { label: 'Permissions', icon: 'solar:shield-bold', content: renderPermissionsTab },
@@ -753,10 +666,6 @@ export function ChatGroupEditDialog({ open, onClose, group }: Props) {
     { label: 'Invite Link', icon: 'solar:link-bold', content: renderInviteTab },
     { label: 'Disappearing', icon: 'solar:clock-circle-bold', content: renderDisappearingTab },
   ];
-
-  if (isAdmin) {
-    TABS.splice(4, 0, { label: 'Requests', icon: 'solar:user-check-bold', content: renderRequestsTab });
-  }
 
   return (
     <Dialog

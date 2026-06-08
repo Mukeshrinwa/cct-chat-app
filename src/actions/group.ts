@@ -405,3 +405,15 @@ export async function rejectJoinRequest(groupId: string, requestId: string) {
     throw error;
   }
 }
+export async function bulkHandleJoinRequests(groupId: string, action: 'approve' | 'reject', requestIds?: string[]) {
+  try {
+    const res = await axios.post(`/api/v1/groups/${groupId}/join-requests/bulk`, { action, requestIds });
+    mutate(`/api/v1/groups/${groupId}/join-requests`);
+    mutate(`/api/v1/groups/${groupId}`);
+    mutate('/api/v1/groups');
+    return res.data;
+  } catch (error) {
+    console.error(`Failed to bulk ${action} join requests:`, error);
+    throw error;
+  }
+}

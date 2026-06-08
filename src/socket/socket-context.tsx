@@ -366,78 +366,76 @@ export function SocketProvider({ children }: SocketProviderProps) {
     // -----------------------------------------------------------------------
     // 6. TYPING - user_typing
     // -----------------------------------------------------------------------
-    socketInstance.on(
-      'user_typing',
-      (payload: { conversationId: string; userId: string; typing?: boolean }) => {
-        const { conversationId, userId, typing } = payload;
-        if (userId === currentUserId) return;
+    const handleTypingEvent = (payload: { conversationId: string; userId: string; typing?: boolean }, isTyping: boolean) => {
+      const { conversationId, userId } = payload;
+      if (userId === currentUserId) return;
 
-        const key = `${conversationId}-${userId}`;
+      const key = `${conversationId}-${userId}`;
 
-        // Resolve name from store
-        const {conversations} = useChatStore.getState();
-        let typingName = 'Someone';
-        let targetConvId = conversationId;
+      // Resolve name from store
+      const {conversations} = useChatStore.getState();
+      let typingName = 'Someone';
+      let targetConvId = conversationId;
 
-        if (targetConvId === 'temp') {
-          const directConv = conversations.find(
-            (c) =>
-              !c.isGroup &&
-              (c.otherUser?._id === userId || c.otherUser?.id === userId)
-          );
-          if (directConv) targetConvId = directConv._id;
+      if (targetConvId === 'temp') {
+        const directConv = conversations.find(
+          (c) =>
+            !c.isGroup &&
+            (c.otherUser?._id === userId || c.otherUser?.id === userId)
+        );
+        if (directConv) targetConvId = directConv._id;
+      }
+
+      const targetConv = conversations.find((c) => c._id === targetConvId);
+      if (targetConv) {
+        const participant = targetConv.participants?.find((p: any) => {
+          const pId = typeof p === 'string' ? p : p._id || p.id;
+          return pId === userId;
+        });
+        if (participant && typeof participant === 'object' && participant.name) {
+          typingName = participant.name;
+        } else if (
+          targetConv.otherUser &&
+          (targetConv.otherUser._id === userId || targetConv.otherUser.id === userId)
+        ) {
+          typingName = targetConv.otherUser.name;
         }
+      }
 
-        const targetConv = conversations.find((c) => c._id === targetConvId);
-        if (targetConv) {
-          const participant = targetConv.participants?.find((p: any) => {
-            const pId = typeof p === 'string' ? p : p._id || p.id;
-            return pId === userId;
-          });
-          if (participant && typeof participant === 'object' && participant.name) {
-            typingName = participant.name;
-          } else if (
-            targetConv.otherUser &&
-            (targetConv.otherUser._id === userId || targetConv.otherUser.id === userId)
-          ) {
-            typingName = targetConv.otherUser.name;
-          }
+      if (isTyping === false) {
+        if (typingTimeouts[key]) {
+          clearTimeout(typingTimeouts[key]);
+          delete typingTimeouts[key];
         }
-
-        // typing: false aaya — turant clear karo, timeout ka wait mat karo
-        if (typing === false) {
-          if (typingTimeouts[key]) {
-            clearTimeout(typingTimeouts[key]);
-            delete typingTimeouts[key];
-          }
-          useChatStore.getState().setTypingUser(targetConvId, typingName, false);
-          setTypingUsers((prev) => {
-            const list = prev[conversationId] || [];
-            return { ...prev, [conversationId]: list.filter((id) => id !== userId) };
-          });
-          return;
-        }
-
-        // typing: true — user ko list mein add karo
-        useChatStore.getState().setTypingUser(targetConvId, typingName, true);
+        useChatStore.getState().setTypingUser(targetConvId, typingName, false);
         setTypingUsers((prev) => {
           const list = prev[conversationId] || [];
-          if (list.includes(userId)) return prev;
-          return { ...prev, [conversationId]: [...list, userId] };
+          return { ...prev, [conversationId]: list.filter((id) => id !== userId) };
         });
-
-        // Fallback: agar false kabhi na aaye to 4s baad auto-clear
-        if (typingTimeouts[key]) clearTimeout(typingTimeouts[key]);
-        typingTimeouts[key] = setTimeout(() => {
-          useChatStore.getState().setTypingUser(targetConvId, typingName, false);
-          setTypingUsers((prev) => {
-            const list = prev[conversationId] || [];
-            return { ...prev, [conversationId]: list.filter((id) => id !== userId) };
-          });
-          delete typingTimeouts[key];
-        }, 4000);
+        return;
       }
-    );
+
+      useChatStore.getState().setTypingUser(targetConvId, typingName, true);
+      setTypingUsers((prev) => {
+        const list = prev[conversationId] || [];
+        if (list.includes(userId)) return prev;
+        return { ...prev, [conversationId]: [...list, userId] };
+      });
+
+      if (typingTimeouts[key]) clearTimeout(typingTimeouts[key]);
+      typingTimeouts[key] = setTimeout(() => {
+        useChatStore.getState().setTypingUser(targetConvId, typingName, false);
+        setTypingUsers((prev) => {
+          const list = prev[conversationId] || [];
+          return { ...prev, [conversationId]: list.filter((id) => id !== userId) };
+        });
+        delete typingTimeouts[key];
+      }, 4000);
+    };
+
+    socketInstance.on('user_typing', (payload) => handleTypingEvent(payload, payload.typing ?? true));
+    socketInstance.on('typing_start', (payload) => handleTypingEvent(payload, true));
+    socketInstance.on('typing_stop', (payload) => handleTypingEvent(payload, false));
 
     // -----------------------------------------------------------------------
     // 7. RECORDING - user_recording
@@ -799,6 +797,8 @@ export function SocketProvider({ children }: SocketProviderProps) {
       socketInstance.off('new_message');
       socketInstance.off('message_delivered');
       socketInstance.off('user_typing');
+      socketInstance.off('typing_start');
+      socketInstance.off('typing_stop');
       socketInstance.off('user_recording');
       socketInstance.off('user_updated');
       socketInstance.off('user_blocked');

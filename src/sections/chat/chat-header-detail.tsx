@@ -267,6 +267,15 @@ export function ChatHeaderDetail({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId]);
 
+  const typingUserIds = typingUsers[conversationId] || [];
+  const typingUserNames = typingUserIds
+    .map((id) => participants.find((p) => p.id === id)?.name)
+    .filter(Boolean);
+
+  const groupTypingText = typingUserNames.length > 0
+    ? (typingUserNames.length === 1 ? `${typingUserNames[0]} is typing...` : 'Multiple people are typing...')
+    : null;
+
   const renderGroup = (
     <Stack direction="row" alignItems="center" spacing={2}>
       {currentGroup?.groupAvatar ? (
@@ -285,7 +294,13 @@ export function ChatHeaderDetail({
 
       <ListItemText
         primary={currentGroup?.groupName || 'Group Chat'}
-        secondary={`${participants.length + (isUserMember ? 1 : 0)} members`}
+        secondary={
+          groupTypingText ? (
+            <span style={{ color: '#00a884', fontWeight: 600 }}>{groupTypingText}</span>
+          ) : (
+            `${participants.length + (isUserMember ? 1 : 0)} members`
+          )
+        }
         secondaryTypographyProps={{
           component: 'span',
           color: 'text.secondary',

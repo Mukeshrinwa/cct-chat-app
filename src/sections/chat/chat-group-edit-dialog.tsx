@@ -36,6 +36,9 @@ import {
   updateGroup,
   promoteToAdmin,
   demoteFromAdmin,
+  rejectJoinRequest,
+  approveJoinRequest,
+  useGetJoinRequests,
   generateGroupInviteLink,
   updateDisappearingMessages,
 } from 'src/actions/group';
@@ -44,6 +47,8 @@ import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 
 import { useMockedUser } from 'src/auth/hooks';
+
+import { ChatShareInviteDialog } from './chat-share-invite-dialog';
 
 // ----------------------------------------------------------------------
 
@@ -87,6 +92,14 @@ export function ChatGroupEditDialog({ open, onClose, group }: Props) {
 
   // ── Admin management ───────────────────────────────────────────────
   const [adminLoading, setAdminLoading] = useState<string | null>(null);
+
+  // ── Share Invite ───────────────────────────────────────────────────
+  const [shareOpen, setShareOpen] = useState(false);
+
+  // ── Join Requests ───────────────────────────────────────────────────
+  const { requests, requestsLoading } = useGetJoinRequests(group?._id);
+  const [approving, setApproving] = useState<string | null>(null);
+  const [rejecting, setRejecting] = useState<string | null>(null);
 
   // ── Save / Delete ──────────────────────────────────────────────────
   const [saving, setSaving] = useState(false);
@@ -133,12 +146,45 @@ export function ChatGroupEditDialog({ open, onClose, group }: Props) {
       // already reflects the new value, so this is always correct.
       // disappearingMode lives on the nested conversationId object per the API response
       setDisappearingMode(group.conversationId?.disappearingMode || group.disappearingMode || 'off');
-      setInviteLink(group.inviteLink || '');
+      
+      let link = group.inviteLink;
+      if (!link) {
+        const code = group.inviteCode || group.inviteToken;
+        if (code) {
+          link = `${window.location.origin}/group/invite/${code}`;
+        }
+      }
+      setInviteLink(link || '');
+      
       setActiveTab(0);
     }
   }, [group, open]);
 
   // ── Handlers ────────────────────────────────────────────────────────
+
+  const handleApproveRequest = async (reqId: string) => {
+    try {
+      setApproving(reqId);
+      await approveJoinRequest(group._id, reqId);
+      toast.success('Request approved');
+    } catch {
+      toast.error('Failed to approve request');
+    } finally {
+      setApproving(null);
+    }
+  };
+
+  const handleRejectRequest = async (reqId: string) => {
+    try {
+      setRejecting(reqId);
+      await rejectJoinRequest(group._id, reqId);
+      toast.success('Request rejected');
+    } catch {
+      toast.error('Failed to reject request');
+    } finally {
+      setRejecting(null);
+    }
+  };
 
   const handleSave = async () => {
     if (!groupName.trim()) { toast.error('Group name is required'); return; }
@@ -178,8 +224,16 @@ export function ChatGroupEditDialog({ open, onClose, group }: Props) {
     try {
       setGeneratingLink(true);
       const res = await generateGroupInviteLink(group._id);
-      const link = res?.data?.inviteLink || res?.inviteLink || '';
-      setInviteLink(link);
+      
+      let link = res?.data?.inviteLink || res?.inviteLink;
+      if (!link) {
+        const code = res?.data?.inviteCode || res?.data?.token;
+        if (code) {
+          link = `${window.location.origin}/group/invite/${code}`;
+        }
+      }
+      
+      setInviteLink(link || '');
       toast.success('Invite link generated');
     } catch {
       toast.error('Failed to generate invite link');
@@ -556,16 +610,29 @@ export function ChatGroupEditDialog({ open, onClose, group }: Props) {
             }}
             sx={{ '& input': { fontSize: 13 } }}
           />
-          <Button
-            variant="outlined"
-            color="inherit"
-            size="small"
-            startIcon={<Iconify icon="solar:restart-bold" width={16} />}
-            onClick={handleGenerateLink}
-            disabled={generatingLink}
-          >
-            Regenerate Link
-          </Button>
+          <Stack direction="row" spacing={1.5}>
+            <Button
+              variant="outlined"
+              color="inherit"
+              size="small"
+              startIcon={<Iconify icon="solar:restart-bold" width={16} />}
+              onClick={handleGenerateLink}
+              disabled={generatingLink}
+              sx={{ flexGrow: 1 }}
+            >
+              Regenerate Link
+            </Button>
+            <Button
+              variant="contained"
+              color="primary"
+              size="small"
+              startIcon={<Iconify icon="solar:share-bold" width={16} />}
+              onClick={() => setShareOpen(true)}
+              sx={{ flexGrow: 1 }}
+            >
+              Share to Chat
+            </Button>
+          </Stack>
         </Stack>
       ) : (
         <LoadingButton
@@ -625,6 +692,60 @@ export function ChatGroupEditDialog({ open, onClose, group }: Props) {
     </Stack>
   );
 
+  const renderRequestsTab = (
+    <Stack spacing={1.5}>
+      {requestsLoading ? (
+        <Stack alignItems="center" sx={{ py: 3 }}><CircularProgress size={24} /></Stack>
+      ) : !requests || requests.length === 0 ? (
+        <Alert severity="info">No pending join requests.</Alert>
+      ) : (
+        <List disablePadding>
+          {requests.map((req: any) => {
+            const reqId = req._id || req.id;
+            const u = req.userId || req.user || {};
+            const isApproving = approving === reqId;
+            const isRejecting = rejecting === reqId;
+            return (
+              <Box key={reqId}>
+                <ListItemButton disableRipple sx={{ px: 1, py: 1, borderRadius: 1.5, '&:hover': { bgcolor: 'transparent' } }}>
+                  <Avatar src={u.avatar || u.avatarUrl || ''} alt={u.name} sx={{ width: 38, height: 38, mr: 1.5 }} />
+                  <ListItemText
+                    primary={<Typography variant="subtitle2" noWrap>{u.name || 'Unknown User'}</Typography>}
+                    secondary={`@${u.username || ''}`}
+                    secondaryTypographyProps={{ noWrap: true, typography: 'caption' }}
+                  />
+                  <Stack direction="row" spacing={1}>
+                    <LoadingButton
+                      size="small"
+                      color="error"
+                      variant="outlined"
+                      loading={isRejecting}
+                      disabled={isApproving}
+                      onClick={() => handleRejectRequest(reqId)}
+                    >
+                      Reject
+                    </LoadingButton>
+                    <LoadingButton
+                      size="small"
+                      color="primary"
+                      variant="contained"
+                      loading={isApproving}
+                      disabled={isRejecting}
+                      onClick={() => handleApproveRequest(reqId)}
+                    >
+                      Approve
+                    </LoadingButton>
+                  </Stack>
+                </ListItemButton>
+                <Divider sx={{ mx: 1 }} />
+              </Box>
+            );
+          })}
+        </List>
+      )}
+    </Stack>
+  );
+
   const TABS = [
     { label: 'General', icon: 'solar:settings-bold', content: renderGeneralTab },
     { label: 'Permissions', icon: 'solar:shield-bold', content: renderPermissionsTab },
@@ -632,6 +753,10 @@ export function ChatGroupEditDialog({ open, onClose, group }: Props) {
     { label: 'Invite Link', icon: 'solar:link-bold', content: renderInviteTab },
     { label: 'Disappearing', icon: 'solar:clock-circle-bold', content: renderDisappearingTab },
   ];
+
+  if (isAdmin) {
+    TABS.splice(4, 0, { label: 'Requests', icon: 'solar:user-check-bold', content: renderRequestsTab });
+  }
 
   return (
     <Dialog
@@ -707,6 +832,14 @@ export function ChatGroupEditDialog({ open, onClose, group }: Props) {
             </LoadingButton>
           </Stack>
         </DialogActions>
+      )}
+      {shareOpen && (
+        <ChatShareInviteDialog
+          open={shareOpen}
+          onClose={() => setShareOpen(false)}
+          groupData={group}
+          inviteLink={inviteLink}
+        />
       )}
     </Dialog>
   );

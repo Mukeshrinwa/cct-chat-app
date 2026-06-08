@@ -19,6 +19,8 @@ const Page404 = lazy(() => import('src/pages/error/404'));
 // Blank
 const BlankPage = lazy(() => import('src/pages/blank'));
 
+const GroupInvitePage = lazy(() => import('src/pages/group-invite'));
+
 // ----------------------------------------------------------------------
 
 export const mainRoutes = [
@@ -46,8 +48,6 @@ export const mainRoutes = [
             path: 'blank',
             element: <BlankPage />,
           },
-         
-         
         ],
       },
      
@@ -57,6 +57,14 @@ export const mainRoutes = [
         element: (
           <SimpleLayout content={{ compact: true }}>
             <ComingSoonPage />
+          </SimpleLayout>
+        ),
+      },
+      {
+        path: 'group/invite/:code',
+        element: (
+          <SimpleLayout content={{ compact: true }}>
+            <GroupInvitePage />
           </SimpleLayout>
         ),
       },

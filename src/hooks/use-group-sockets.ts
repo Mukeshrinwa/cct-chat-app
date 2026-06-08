@@ -317,6 +317,32 @@ export const useGroupSockets = (currentUserId: string | undefined) => {
     };
 
     // -----------------------------------------------------------------------
+    // JOIN REQUEST EVENTS
+    // -----------------------------------------------------------------------
+
+    const handleJoinRequestReceived = (data: any) => {
+      const { groupId } = data;
+      // Invalidate the join requests list so admins see the new request
+      mutate(`/api/v1/groups/${groupId}/join-requests`);
+    };
+
+    const handleJoinRequestApproved = (data: any) => {
+      const { groupId } = data;
+      // Invalidate so the user sees the new group and conversation
+      mutate('/api/v1/groups');
+      mutate('/api/v1/chats/conversations');
+      if (groupId) mutate(`/api/v1/groups/${groupId}`);
+    };
+
+    const handleJoinRequestRejected = (data: any) => {
+      const { groupId } = data;
+      // Just invalidate in case user is viewing their pending requests
+      mutate('/api/v1/groups');
+      if (groupId) mutate(`/api/v1/groups/${groupId}`);
+    };
+
+
+    // -----------------------------------------------------------------------
     // Register all listeners
     // -----------------------------------------------------------------------
     socket.on('group_created', handleGroupCreated);
@@ -336,6 +362,10 @@ export const useGroupSockets = (currentUserId: string | undefined) => {
     socket.on('group_call_declined', handleGroupCallDeclined);
     socket.on('group_call_ended', handleGroupCallEnded);
 
+    socket.on('join_request_received', handleJoinRequestReceived);
+    socket.on('join_request_approved', handleJoinRequestApproved);
+    socket.on('join_request_rejected', handleJoinRequestRejected);
+
     return () => {
       socket.off('group_created', handleGroupCreated);
       socket.off('group_updated', handleGroupUpdated);
@@ -353,6 +383,10 @@ export const useGroupSockets = (currentUserId: string | undefined) => {
       socket.off('group_call_left', handleGroupCallLeft);
       socket.off('group_call_declined', handleGroupCallDeclined);
       socket.off('group_call_ended', handleGroupCallEnded);
+
+      socket.off('join_request_received', handleJoinRequestReceived);
+      socket.off('join_request_approved', handleJoinRequestApproved);
+      socket.off('join_request_rejected', handleJoinRequestRejected);
     };
   }, [currentUserId, cache]);
 };

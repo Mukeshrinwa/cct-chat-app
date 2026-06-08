@@ -23,6 +23,7 @@ import { fToNow } from 'src/utils/format-time';
 import { fData } from 'src/utils/format-number';
 import { getMediaUrl } from 'src/utils/chat-utils';
 
+import { joinGroupByLink } from 'src/actions/group';
 import { editMessage, deleteMessage, reactToMessage } from 'src/actions/chat';
 
 import { toast } from 'src/components/snackbar';
@@ -33,6 +34,7 @@ import { useMockedUser } from 'src/auth/hooks';
 
 import { useMessage } from './hooks/use-message';
 import { ChatForwardDialog } from './chat-forward-dialog';
+import { ChatGroupInviteDialog } from './chat-group-invite-dialog';
 
 // ----------------------------------------------------------------------
 
@@ -108,9 +110,23 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
     return getMediaUrl(body);
   })();
 
+  const isGroupInvite =
+    message.contentType === 'group_invite' ||
+    (typeof body === 'string' && body.includes('"type":"group_invite"'));
+
+  const groupInviteData = isGroupInvite ? (() => {
+    try {
+      if (typeof body === 'object') return body;
+      return JSON.parse(body);
+    } catch {
+      return null;
+    }
+  })() : null;
+
   const isTextMsg =
     !hasImage &&
     !isAudio &&
+    !isGroupInvite &&
     !(message.attachments && message.attachments.length > 0) &&
     !message.isDeleted;
 
@@ -127,6 +143,9 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
 
   // Reactions Popover State
   const [reactionAnchorEl, setReactionAnchorEl] = useState<HTMLButtonElement | null>(null);
+
+  // Group Invite Modal State
+  const [inviteModalCode, setInviteModalCode] = useState<string | null>(null);
 
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [mobileActionsPosition, setMobileActionsPosition] = useState<{ top: number; left: number } | null>(null);
@@ -355,6 +374,38 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
             </IconButton>
           </Stack>
         </Stack>
+      ) : isGroupInvite && groupInviteData ? (
+        <Stack spacing={1.5} sx={{ width: 260 }}>
+          <Stack direction="row" alignItems="center" spacing={1.5}>
+            <Avatar src={groupInviteData.groupAvatar} alt={groupInviteData.groupName} sx={{ width: 48, height: 48 }} />
+            <Stack spacing={0}>
+              <Typography variant="subtitle2">{groupInviteData.groupName || 'Group Chat'}</Typography>
+              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                {groupInviteData.memberCount || 0} members
+              </Typography>
+            </Stack>
+          </Stack>
+          <Button
+            variant="contained"
+            color="primary"
+            fullWidth
+            size="small"
+            onClick={async () => {
+              try {
+                const res = await joinGroupByLink(groupInviteData.inviteLink);
+                if (res?.status === 'pending' || res?.message?.toLowerCase().includes('request') || res?.data?.needsApproval || res?.needsApproval) {
+                  toast.success('Join request sent to group admins for approval.');
+                } else {
+                  toast.success('Joined group successfully!');
+                }
+              } catch (err: any) {
+                toast.error(err.message || err.error || 'Failed to join group. You might already be a member, or the link requires approval.');
+              }
+            }}
+          >
+            Join Group
+          </Button>
+        </Stack>
       ) : hasImage ? (
         <Box
           component="img"
@@ -417,45 +468,104 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
         </Stack>
       ) : (
         <>
-          {body.length > 300 && !isExpanded ? (
-            <>
-              {body.slice(0, 300)}...{' '}
-              <Box
-                component="span"
-                onClick={() => setIsExpanded(true)}
-                sx={{
-                  color: me ? 'inherit' : 'primary.main',
-                  fontWeight: 'bold',
-                  cursor: 'pointer',
-                  textDecoration: 'none',
-                  '&:hover': { textDecoration: 'underline' },
-                }}
-              >
-                Read more
-              </Box>
-            </>
-          ) : body.length > 300 ? (
-            <>
-              {body}{' '}
-              <Box
-                component="span"
-                onClick={() => setIsExpanded(false)}
-                sx={{
-                  color: me ? 'inherit' : 'primary.main',
-                  fontWeight: 'bold',
-                  cursor: 'pointer',
-                  textDecoration: 'none',
-                  '&:hover': { textDecoration: 'underline' },
-                  display: 'inline-block',
-                  ml: 0.5,
-                }}
-              >
-                Read less
-              </Box>
-            </>
-          ) : (
-            body
-          )}
+          {(() => {
+            const renderTextWithLinks = (text: string) => {
+              const urlRegex = /(https?:\/\/[^\s]+)/g;
+              const parts = text.split(urlRegex);
+              return parts.map((part, i) => {
+                if (part.match(urlRegex)) {
+                  const inviteMatch = part.match(/\/group\/invite\/([^/]+)/);
+                  
+                  if (inviteMatch && inviteMatch[1]) {
+                    const code = inviteMatch[1];
+                    return (
+                      <Box
+                        component="span"
+                        key={i}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          e.preventDefault();
+                          setInviteModalCode(code);
+                        }}
+                        sx={{
+                          cursor: 'pointer',
+                          color: me ? 'inherit' : 'primary.main',
+                          textDecoration: 'underline',
+                          wordBreak: 'break-all',
+                          '&:hover': { opacity: 0.8 },
+                        }}
+                      >
+                        {part}
+                      </Box>
+                    );
+                  }
+
+                  return (
+                    <Box
+                      component="a"
+                      key={i}
+                      href={part}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      sx={{
+                        color: me ? 'inherit' : 'primary.main',
+                        textDecoration: 'underline',
+                        wordBreak: 'break-all',
+                        '&:hover': { opacity: 0.8 },
+                      }}
+                    >
+                      {part}
+                    </Box>
+                  );
+                }
+                return <span key={i}>{part}</span>;
+              });
+            };
+
+            if (body.length > 300 && !isExpanded) {
+              return (
+                <>
+                  {renderTextWithLinks(body.slice(0, 300))}...{' '}
+                  <Box
+                    component="span"
+                    onClick={() => setIsExpanded(true)}
+                    sx={{
+                      color: me ? 'inherit' : 'primary.main',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      textDecoration: 'none',
+                      '&:hover': { textDecoration: 'underline' },
+                    }}
+                  >
+                    Read more
+                  </Box>
+                </>
+              );
+            }
+            if (body.length > 300) {
+              return (
+                <>
+                  {renderTextWithLinks(body)}{' '}
+                  <Box
+                    component="span"
+                    onClick={() => setIsExpanded(false)}
+                    sx={{
+                      color: me ? 'inherit' : 'primary.main',
+                      fontWeight: 'bold',
+                      cursor: 'pointer',
+                      textDecoration: 'none',
+                      '&:hover': { textDecoration: 'underline' },
+                      display: 'inline-block',
+                      ml: 0.5,
+                    }}
+                  >
+                    Read less
+                  </Box>
+                </>
+              );
+            }
+            return renderTextWithLinks(body);
+          })()}
         </>
       )}
     </Stack>
@@ -787,6 +897,14 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
           open={forwardDialogOpen}
           onClose={() => setForwardDialogOpen(false)}
           messageId={message.id}
+        />
+      )}
+
+      {!!inviteModalCode && (
+        <ChatGroupInviteDialog
+          open={!!inviteModalCode}
+          onClose={() => setInviteModalCode(null)}
+          inviteCode={inviteModalCode}
         />
       )}
     </Stack>

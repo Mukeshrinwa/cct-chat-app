@@ -243,7 +243,7 @@ export async function demoteFromAdmin(groupId: string, userId: string) {
 
 export async function generateGroupInviteLink(groupId: string) {
   try {
-    const res = await axios.post(`/api/v1/groups/${groupId}/invite-link`);
+    const res = await axios.post(`/api/v1/groups/${groupId}/invite-links`);
     mutate('/api/v1/groups');
     mutate(`/api/v1/groups/${groupId}`);
     return res.data;
@@ -298,3 +298,110 @@ export async function updateDisappearingMessages(conversationId: string, mode: s
   }
 }
 
+// ----------------------------------------------------------------------
+
+export async function joinGroupByLink(inviteLinkOrCode: string) {
+  try {
+    let code = inviteLinkOrCode;
+    // Extract code if it's a full URL
+    const match = inviteLinkOrCode.match(/\/group\/invite\/([^/]+)/);
+    if (match && match[1]) {
+      code = match[1];
+    }
+    
+    // The backend error "The data argument must be of type string... Received undefined"
+    // implies it's trying to hash something (like crypto.createHash('sha256').update(req.body.token)).
+    // So it expects the body to contain 'token' or 'inviteCode'.
+    const res = await axios.post('/api/v1/groups/join-by-link', { 
+      inviteLink: code,
+      token: code,
+      inviteCode: code
+    });
+    
+    mutate('/api/v1/groups');
+    mutate('/api/v1/chats/conversations');
+    return res.data;
+  } catch (error) {
+    console.error('Failed to join group by link:', error);
+    throw error;
+  }
+}
+
+// ----------------------------------------------------------------------
+
+export async function sendJoinRequest(groupId: string) {
+  try {
+    const res = await axios.post(`/api/v1/groups/${groupId}/join-request`);
+    mutate(`/api/v1/groups/${groupId}`);
+    return res.data;
+  } catch (error) {
+    console.error('Failed to send join request:', error);
+    throw error;
+  }
+}
+
+// ----------------------------------------------------------------------
+
+export function useGetJoinRequests(groupId: string) {
+  const url = groupId ? `/api/v1/groups/${groupId}/join-requests` : '';
+
+  const { data, isLoading, error, isValidating } = useSWR<any>(
+    url,
+    fetcher,
+    swrOptions
+  );
+
+  const memoizedValue = useMemo(
+    () => {
+      let reqs: any[] = [];
+      if (Array.isArray(data)) {
+        reqs = data;
+      } else if (data?.data && Array.isArray(data.data)) {
+        reqs = data.data;
+      } else if (data?.requests) {
+        reqs = data.requests;
+      } else if (data?.data?.requests) {
+        reqs = data.data.requests;
+      }
+
+      return {
+        requests: reqs,
+        requestsLoading: isLoading,
+        requestsError: error,
+        requestsValidating: isValidating,
+        requestsEmpty: !isLoading && !reqs.length,
+      };
+    },
+    [data, error, isLoading, isValidating]
+  );
+
+  return memoizedValue;
+}
+
+// ----------------------------------------------------------------------
+
+export async function approveJoinRequest(groupId: string, requestId: string) {
+  try {
+    const res = await axios.patch(`/api/v1/groups/${groupId}/join-requests/${requestId}/approve`);
+    mutate(`/api/v1/groups/${groupId}/join-requests`);
+    mutate(`/api/v1/groups/${groupId}`);
+    mutate('/api/v1/groups');
+    return res.data;
+  } catch (error) {
+    console.error('Failed to approve join request:', error);
+    throw error;
+  }
+}
+
+// ----------------------------------------------------------------------
+
+export async function rejectJoinRequest(groupId: string, requestId: string) {
+  try {
+    const res = await axios.patch(`/api/v1/groups/${groupId}/join-requests/${requestId}/reject`);
+    mutate(`/api/v1/groups/${groupId}/join-requests`);
+    return res.data;
+  } catch (error) {
+    console.error('Failed to reject join request:', error);
+    throw error;
+  }
+}

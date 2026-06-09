@@ -316,7 +316,7 @@ export function ChatView() {
   );
 
   return (
-    <Box sx={{ display: 'flex', flex: '1 1 auto', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
+    <Box sx={{ display: 'flex', flex: '1 1 auto', flexDirection: 'column', height: { xs: 'calc(100dvh - 64px)', md: 'calc(100dvh - 72px)' }, overflow: 'hidden' }}>
       <Layout
         sx={{
           minHeight: 0,

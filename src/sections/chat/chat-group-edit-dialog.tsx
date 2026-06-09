@@ -42,6 +42,7 @@ import {
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
+import { ConfirmDialog } from 'src/components/custom-dialog';
 
 import { useMockedUser } from 'src/auth/hooks';
 
@@ -101,6 +102,7 @@ export function ChatGroupEditDialog({ open, onClose, group }: Props) {
   // ── Save / Delete ──────────────────────────────────────────────────
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
 
   // ── Avatar upload ──────────────────────────────────────────────────
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -108,11 +110,15 @@ export function ChatGroupEditDialog({ open, onClose, group }: Props) {
   const [avatarUploading, setAvatarUploading] = useState(false);
 
   // Derived
-  const ownerId: string = group?.owner?.id || group?.owner?._id || group?.owner || '';
-  const currentUserId = (user as any)?.id || (user as any)?._id || '';
-  const isOwner = !!currentUserId && currentUserId === ownerId;
+  const rawOwnerId = group?.owner?.id || group?.owner?._id || group?.owner || '';
+  const rawUserId = (user as any)?.id || (user as any)?._id || '';
+  
+  const ownerId = String(rawOwnerId);
+  const currentUserId = String(rawUserId);
+  const isOwner = !!rawUserId && currentUserId === ownerId;
+
   const adminIds = new Set<string>(
-    (group?.admins || []).map((a: any) => a.id || a._id || a)
+    (group?.admins || []).map((a: any) => String(a.id || a._id || a))
   );
   const isAdmin = isOwner || adminIds.has(currentUserId);
 
@@ -179,15 +185,16 @@ export function ChatGroupEditDialog({ open, onClose, group }: Props) {
   };
 
   const handleDelete = async () => {
-    if (!window.confirm('Are you sure you want to delete this group? This cannot be undone.')) return;
     try {
       setDeleting(true);
       await deleteGroup(group._id);
       toast.success('Group deleted successfully');
+      setDeleteModalOpen(false);
       onClose();
       router.push(paths.dashboard.chat);
     } catch {
       toast.error('Failed to delete group');
+      setDeleteModalOpen(false);
     } finally {
       setDeleting(false);
     }
@@ -751,15 +758,14 @@ export function ChatGroupEditDialog({ open, onClose, group }: Props) {
       {activeTab === 0 && (
         <DialogActions sx={{ p: 2.5, display: 'flex', justifyContent: 'space-between' }}>
           {isOwner ? (
-            <LoadingButton
+            <Button
               variant="outlined"
               color="error"
-              onClick={handleDelete}
-              loading={deleting}
+              onClick={() => setDeleteModalOpen(true)}
               startIcon={<Iconify icon="solar:trash-bin-trash-bold" />}
             >
               Delete Group
-            </LoadingButton>
+            </Button>
           ) : <Box />}
 
           <Stack direction="row" spacing={1.5}>
@@ -780,6 +786,23 @@ export function ChatGroupEditDialog({ open, onClose, group }: Props) {
           inviteLink={inviteLink}
         />
       )}
+
+      <ConfirmDialog
+        open={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        title="Delete Group"
+        content="Are you sure you want to delete this group? All messages and media will be permanently removed for all members. This cannot be undone."
+        action={
+          <LoadingButton
+            variant="contained"
+            color="error"
+            onClick={handleDelete}
+            loading={deleting}
+          >
+            Delete
+          </LoadingButton>
+        }
+      />
     </Dialog>
   );
 }

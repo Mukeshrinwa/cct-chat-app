@@ -43,8 +43,8 @@ export function ChatGroupCreateDialog({ open, onClose, chatContacts, preSelected
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [groupName, setGroupName] = useState('');
-  const [groupAvatar, setGroupAvatar] = useState('');
   const [avatarPreview, setAvatarPreview] = useState('');
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -63,18 +63,14 @@ export function ChatGroupCreateDialog({ open, onClose, chatContacts, preSelected
       return;
     }
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const base64String = reader.result as string;
-      setGroupAvatar(base64String);
-      setAvatarPreview(base64String);
-    };
-    reader.readAsDataURL(file);
+    setAvatarFile(file);
+    const previewUrl = URL.createObjectURL(file);
+    setAvatarPreview(previewUrl);
   }, []);
 
   const handleRemoveAvatar = () => {
-    setGroupAvatar('');
     setAvatarPreview('');
+    setAvatarFile(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -84,8 +80,8 @@ export function ChatGroupCreateDialog({ open, onClose, chatContacts, preSelected
   useEffect(() => {
     if (open) {
       setGroupName('');
-      setGroupAvatar('');
       setAvatarPreview('');
+      setAvatarFile(null);
       setSearchQuery('');
       setSelectedIds(preSelectedIds.length > 0 ? preSelectedIds : []);
     } else if (fileInputRef.current) fileInputRef.current.value = '';
@@ -125,7 +121,7 @@ export function ChatGroupCreateDialog({ open, onClose, chatContacts, preSelected
       const res = await createGroup({
         name: groupName.trim(),
         participants: selectedIds,
-        avatar: groupAvatar || undefined,
+        avatarFile: avatarFile || undefined,
       });
 
       toast.success('Group created successfully');

@@ -62,11 +62,14 @@ export function useGetGroup(groupId: string) {
 
 // ----------------------------------------------------------------------
 
-export async function createGroup(groupData: { name: string; participants: string[]; avatar?: string }) {
+export async function createGroup(groupData: { name: string; participants: string[]; avatarFile?: File }) {
   try {
     let socketSent = false;
+    let resData = null;
+
     try {
-      if (socketService.isConnected()) {
+      if (socketService.isConnected() && !groupData.avatarFile) {
+        // Only use socket for creation if there's no avatar to upload
         await socketService.emit('create_group', {
           name: groupData.name,
           participants: groupData.participants,
@@ -78,11 +81,31 @@ export async function createGroup(groupData: { name: string; participants: strin
       console.error('Socket createGroup failed, falling back to HTTP API:', socketError);
     }
 
-    let resData = null;
     if (!socketSent) {
-      const res = await axios.post('/api/v1/groups/create', groupData);
+      const payload = {
+        name: groupData.name,
+        participants: groupData.participants,
+      };
+      
+      // Step 1: Create the group
+      const res = await axios.post('/api/v1/groups', payload);
       resData = res.data;
-      console.log('Group created via HTTP API fallback');
+      console.log('Group created via HTTP API');
+
+      // Step 2: Upload the avatar if one was provided
+      if (groupData.avatarFile) {
+        const newGroupId = resData?.data?.conversationId?._id || resData?.data?.conversationId || resData?.conversationId?._id || resData?.conversationId || resData?.data?._id;
+        
+        if (newGroupId) {
+          const formData = new FormData();
+          formData.append('avatar', groupData.avatarFile);
+          
+          await axios.post(`/api/v1/groups/${newGroupId}/avatar`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+          });
+          console.log('Group avatar uploaded via HTTP API');
+        }
+      }
     }
 
     mutate('/api/v1/groups');

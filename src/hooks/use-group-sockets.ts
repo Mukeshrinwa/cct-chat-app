@@ -9,6 +9,8 @@ import { useGroupCallStore } from 'src/store/useGroupCallStore';
 import { useGroupTypingStore } from 'src/store/useGroupTypingStore';
 import { useGroupRealtimeStore } from 'src/store/useGroupRealtimeStore';
 
+import { toast } from 'src/components/snackbar';
+
 // ----------------------------------------------------------------------
 // Reference: cct_chat_employ_user_admin/src/features/groups/sockets/useGroupSockets.ts
 // ----------------------------------------------------------------------
@@ -155,8 +157,7 @@ export const useGroupSockets = (currentUserId: string | undefined) => {
       const chatStore = useChatStore.getState();
       if (chatStore.activeConversationId === conversationId) {
         chatStore.setActiveConversation(null);
-        // eslint-disable-next-line no-alert
-        alert('This group was deleted by the creator.');
+        toast.info('This group was deleted by the creator.');
       }
       const updatedConvs = chatStore.conversations.filter((c) => c._id !== conversationId);
       chatStore.setConversations(updatedConvs);
@@ -195,10 +196,7 @@ export const useGroupSockets = (currentUserId: string | undefined) => {
       if (chatStore.activeConversationId === conversationId) {
         chatStore.setActiveConversation(null);
         if (reason === 'removed') {
-          // eslint-disable-next-line no-alert
-          alert('You were removed from this group by the Admin.');
-        } else if (reason === 'left') {
-          // eslint-disable-next-line no-alert
+          toast.info('You were removed from this group by the Admin.');
         }
       }
       const updatedConvs = chatStore.conversations.filter((c) => c._id !== conversationId);

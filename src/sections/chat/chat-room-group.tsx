@@ -442,9 +442,10 @@ export function ChatRoomGroup({ participants, isUserMember = true }: Props) {
 
 
   // Derive owner id and admin ids from currentGroup
-  const ownerId: string = currentGroup?.owner?.id || currentGroup?.owner?._id || currentGroup?.owner || '';
+  const rawOwnerId = currentGroup?.owner?.id || currentGroup?.owner?._id || currentGroup?.owner || '';
+  const ownerId = String(rawOwnerId);
   const adminIds = new Set<string>(
-    (currentGroup?.admins || []).map((a: any) => a.id || a._id || a)
+    (currentGroup?.admins || []).map((a: any) => String(a.id || a._id || a))
   );
 
   const renderList = (
@@ -549,8 +550,9 @@ export function ChatRoomGroup({ participants, isUserMember = true }: Props) {
     </>
   );
 
-  const userId = user?.id || (user as any)?._id || '';
-  const isAdminOrOwner = !!userId && (userId === ownerId || adminIds.has(userId));
+  const rawUserId = user?.id || (user as any)?._id || '';
+  const userId = String(rawUserId);
+  const isAdminOrOwner = !!rawUserId && (userId === ownerId || adminIds.has(userId));
 
   const renderRequestsList = (
     <Box sx={{ mt: 1 }}>

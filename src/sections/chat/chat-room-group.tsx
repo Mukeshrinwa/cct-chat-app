@@ -2,7 +2,7 @@ import type { IChatParticipant } from 'src/types/chat';
 
 import { mutate } from 'swr';
 import { toast } from 'sonner';
-import { useState, useCallback } from 'react';
+import { useRef, useMemo, useState, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
@@ -20,13 +20,14 @@ import Autocomplete from '@mui/material/Autocomplete';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import ListItemButton from '@mui/material/ListItemButton';
+import CircularProgress from '@mui/material/CircularProgress';
 
 import { paths } from 'src/routes/paths';
 import { useRouter, useSearchParams } from 'src/routes/hooks';
 
 import { useBoolean } from 'src/hooks/use-boolean';
 
-import { useGetContacts } from 'src/actions/chat';
+import { searchUsers } from 'src/api/user';
 import { useGroupStore } from 'src/store/useGroupStore';
 import {
   useGetGroups,
@@ -62,7 +63,6 @@ export function ChatRoomGroup({ participants, isUserMember = true }: Props) {
   const { user } = useMockedUser();
 
   const { groups } = useGetGroups();
-  const { contacts } = useGetContacts();
   const groupStoreGroups = useGroupStore((state) => state.groups);
 
   // Primary: match from SWR list (REST)
@@ -137,10 +137,53 @@ export function ChatRoomGroup({ participants, isUserMember = true }: Props) {
   const [rejecting, setRejecting] = useState<string | null>(null);
   const [bulkActioning, setBulkActioning] = useState<'approve' | 'reject' | null>(null);
 
-  const existingParticipantIds = new Set(groupParticipants.map((participant) => participant.id));
+  const existingParticipantIds = useMemo(() => new Set(groupParticipants.map((participant) => participant.id)), [groupParticipants]);
 
-  const addableContacts = contacts.filter(
-    (contact) => !existingParticipantIds.has(contact.id) && contact.id !== user?.id
+  const [searchRecipients, setSearchRecipients] = useState('');
+  const [options, setOptions] = useState<IChatParticipant[]>([]);
+  const [loadingSearch, setLoadingSearch] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleInputChange = useCallback(
+    (event: any, newValue: string) => {
+      setSearchRecipients(newValue);
+
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+
+      if (!newValue.trim()) {
+        setOptions([]);
+        setLoadingSearch(false);
+        return;
+      }
+
+      setLoadingSearch(true);
+      debounceRef.current = setTimeout(async () => {
+        try {
+          const users = await searchUsers(newValue);
+          const mapped = users.map((u: any) => ({
+            id: u._id,
+            name: u.name,
+            username: u.username,
+            role: u.role || 'user',
+            email: '',
+            address: '',
+            avatarUrl: u.avatar || '',
+            phoneNumber: '',
+            lastActivity: u.lastSeen || new Date().toISOString(),
+            status: u.isOnline ? ('online' as const) : ('offline' as const),
+          }));
+          setOptions(mapped.filter((opt: any) => !existingParticipantIds.has(opt.id) && opt.id !== user?.id));
+        } catch (error) {
+          console.error('Failed to search users globally:', error);
+          setOptions([]);
+        } finally {
+          setLoadingSearch(false);
+        }
+      }, 400);
+    },
+    [existingParticipantIds, user?.id]
   );
 
   const handleOpen = useCallback((participant: IChatParticipant) => {
@@ -160,6 +203,8 @@ export function ChatRoomGroup({ participants, isUserMember = true }: Props) {
     if (isAddingMembers) return;
     setAddMembersOpen(false);
     setMembersToAdd([]);
+    setSearchRecipients('');
+    setOptions([]);
   }, [isAddingMembers]);
 
   const handleAddMembers = useCallback(async () => {
@@ -667,17 +712,39 @@ export function ChatRoomGroup({ participants, isUserMember = true }: Props) {
         <DialogContent>
           <Autocomplete
             multiple
-            options={addableContacts}
+            options={options}
             value={membersToAdd}
+            onInputChange={handleInputChange}
             onChange={(event, value) => setMembersToAdd(value)}
             getOptionLabel={(option) => option.name}
             isOptionEqualToValue={(option, value) => option.id === value.id}
-            renderInput={(params) => <TextField {...params} placeholder="Select users" />}
+            loading={loadingSearch}
+            noOptionsText={loadingSearch ? 'Searching...' : (searchRecipients ? 'No users found' : 'Type to search users')}
+            renderInput={(params) => (
+              <TextField 
+                {...params} 
+                placeholder="Search to add users..." 
+                InputProps={{
+                  ...params.InputProps,
+                  endAdornment: (
+                    <>
+                      {loadingSearch ? <CircularProgress color="inherit" size={20} /> : null}
+                      {params.InputProps.endAdornment}
+                    </>
+                  ),
+                }}
+              />
+            )}
             renderOption={(props, option) => (
               <li {...props} key={option.id}>
                 <Stack direction="row" alignItems="center" spacing={1.2}>
                   <Avatar src={option.avatarUrl} alt={option.name} sx={{ width: 26, height: 26 }} />
-                  <span>{option.name}</span>
+                  <Stack>
+                    <Typography variant="body2">{option.name}</Typography>
+                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                      @{option.username || option.name}
+                    </Typography>
+                  </Stack>
                 </Stack>
               </li>
             )}
@@ -692,7 +759,6 @@ export function ChatRoomGroup({ participants, isUserMember = true }: Props) {
                 />
               ))
             }
-            noOptionsText="No users available to add"
             sx={{ mt: 1 }}
           />
         </DialogContent>

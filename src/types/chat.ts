@@ -24,7 +24,16 @@ export type IChatMessage = {
   isDeleted?: boolean;
   deleteType?: 'everyone' | 'me';
   parentMessageId?: string;
+  parentId?: string;
+  parentMessage?: {
+    _id?: string;
+    messageId?: string;
+    senderId?: string;
+    body?: string;
+    contentType?: string;
+  } | null;
   reactions?: Array<{ emoji: string; senderId: string; username?: string }>;
+
   editedAt?: IDateValue;
   status?: 'sent' | 'delivered' | 'read';
 };

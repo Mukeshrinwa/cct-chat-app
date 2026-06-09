@@ -232,13 +232,18 @@ export function ChatMessageInput({
         contentType: 'document',
         createdAt: fSub({ minutes: 1 }),
         senderId: myContact.id,
+        ...(replyingToMessage && {
+          parentMessageId: replyingToMessage._id || replyingToMessage.id || replyingToMessage.messageId,
+          parentId: replyingToMessage._id || replyingToMessage.id || replyingToMessage.messageId
+        }),
       };
       await sendMessage(selectedConversationId, gifMessageData);
       setGifAnchor(null);
+      setReplyingToMessage(null);
     } catch (error) {
       console.error('Failed to send GIF:', error);
     }
-  }, [selectedConversationId, myContact.id]);
+  }, [selectedConversationId, myContact.id, replyingToMessage, setReplyingToMessage]);
 
   const handleFileChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -249,6 +254,12 @@ export function ChatMessageInput({
       formData.append('file', file);
       formData.append('conversationId', selectedConversationId);
       formData.append('messageId', uuidv4());
+      
+      if (replyingToMessage) {
+        const pId = replyingToMessage._id || replyingToMessage.id || replyingToMessage.messageId;
+        formData.append('parentMessageId', pId);
+        formData.append('parentId', pId);
+      }
 
       await axios.post('/api/v1/files/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -261,7 +272,8 @@ export function ChatMessageInput({
     if (fileRef.current) {
       fileRef.current.value = '';
     }
-  }, [selectedConversationId]);
+    setReplyingToMessage(null);
+  }, [selectedConversationId, replyingToMessage, setReplyingToMessage]);
 
   const handleDocChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -272,6 +284,12 @@ export function ChatMessageInput({
       formData.append('file', file);
       formData.append('conversationId', selectedConversationId);
       formData.append('messageId', uuidv4());
+      
+      if (replyingToMessage) {
+        const pId = replyingToMessage._id || replyingToMessage.id || replyingToMessage.messageId;
+        formData.append('parentMessageId', pId);
+        formData.append('parentId', pId);
+      }
 
       await axios.post('/api/v1/files/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -284,7 +302,8 @@ export function ChatMessageInput({
     if (docRef.current) {
       docRef.current.value = '';
     }
-  }, [selectedConversationId]);
+    setReplyingToMessage(null);
+  }, [selectedConversationId, replyingToMessage, setReplyingToMessage]);
 
 
 
@@ -297,7 +316,10 @@ export function ChatMessageInput({
       contentType: 'text',
       createdAt: fSub({ minutes: 1 }),
       senderId: myContact.id,
-      ...(replyingToMessage && { parentMessageId: replyingToMessage.messageId || replyingToMessage.id || replyingToMessage._id }),
+      ...(replyingToMessage && {
+        parentMessageId: replyingToMessage._id || replyingToMessage.id || replyingToMessage.messageId,
+        parentId: replyingToMessage._id || replyingToMessage.id || replyingToMessage.messageId
+      }),
     }),
     [message, myContact.id, replyingToMessage]
   );
@@ -435,6 +457,12 @@ export function ChatMessageInput({
         formData.append('file', audioFile);
         formData.append('conversationId', selectedConversationId);
         formData.append('messageId', uuidv4());
+        
+        if (replyingToMessage) {
+          const pId = replyingToMessage._id || replyingToMessage.id || replyingToMessage.messageId;
+          formData.append('parentMessageId', pId);
+          formData.append('parentId', pId);
+        }
 
         axios
           .post('/api/v1/files/upload', formData, {
@@ -444,6 +472,7 @@ export function ChatMessageInput({
             console.log('[AUDIO_UPLOAD] Voice note uploaded successfully');
             mutate(`/api/v1/chats/conversations/${selectedConversationId}`);
             mutate('/api/v1/chats/conversations');
+            setReplyingToMessage(null);
           })
           .catch((err) => console.error('[AUDIO_UPLOAD] Failed to upload voice note:', err));
       };
@@ -465,7 +494,7 @@ export function ChatMessageInput({
       console.error('Microphone access denied or error:', error);
       alert('Please allow microphone permissions to record audio.');
     }
-  }, [selectedConversationId, recipients, startRecording]);
+  }, [selectedConversationId, recipients, startRecording, replyingToMessage, setReplyingToMessage]);
 
   const handleStopRecording = useCallback(() => {
     if (!selectedConversationId || !isRecording) return;

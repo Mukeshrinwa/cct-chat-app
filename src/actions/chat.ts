@@ -178,13 +178,13 @@ export function useGetConversations() {
 
       const lastMsg = conv.lastMessage
         ? {
-            id: conv.lastMessage.messageId || conv.lastMessage._id || '',
-            body: conv.lastMessage.text || '',
-            senderId: conv.lastMessage.senderId || (conv.lastMessage.sender === 'me' ? user?.id : conv.otherUser?._id) || '',
-            contentType: conv.lastMessage.type || 'text',
-            createdAt: conv.lastMessageAt || new Date().toISOString(),
-            attachments: [],
-          }
+          id: conv.lastMessage.messageId || conv.lastMessage._id || '',
+          body: conv.lastMessage.text || '',
+          senderId: conv.lastMessage.senderId || (conv.lastMessage.sender === 'me' ? user?.id : conv.otherUser?._id) || '',
+          contentType: conv.lastMessage.type || 'text',
+          createdAt: conv.lastMessageAt || new Date().toISOString(),
+          attachments: [],
+        }
         : null;
 
       const messages = lastMsg ? [lastMsg] : [];
@@ -308,6 +308,10 @@ async function fetchConversationDetail(conversationId: string, currentUser: any)
       reactions: normalized?.reactions || [],
       editedAt: msg.editedAt,
       status: normalized?.status || msg.status || 'sent',
+
+      // Reply fields (so UI can show parent quote)
+      parentMessageId: normalized?.parentMessageId || undefined,
+      parentMessage: normalized?.parentMessage || null,
     };
   });
 
@@ -554,7 +558,7 @@ export async function sendMessage(conversationId: string, messageData: IChatMess
     if (!current || !current.data) return current;
     const conversationsList = current.data;
     const index = conversationsList.findIndex((c: any) => c._id === realConvId);
-    
+
     if (index === -1) return current;
 
     const updatedList = [...conversationsList];
@@ -593,8 +597,8 @@ export async function sendMessage(conversationId: string, messageData: IChatMess
     (messageData.body.startsWith('http://') || messageData.body.startsWith('https://')) &&
     (messageData.body.toLowerCase().includes('giphy') || messageData.body.toLowerCase().includes('.gif'))) ||
     (typeof firstAttachmentUrl === 'string' &&
-    (firstAttachmentUrl.startsWith('http://') || firstAttachmentUrl.startsWith('https://')) &&
-    (firstAttachmentUrl.toLowerCase().includes('giphy') || firstAttachmentUrl.toLowerCase().includes('.gif')));
+      (firstAttachmentUrl.startsWith('http://') || firstAttachmentUrl.startsWith('https://')) &&
+      (firstAttachmentUrl.toLowerCase().includes('giphy') || firstAttachmentUrl.toLowerCase().includes('.gif')));
   const isGifDocument = msgType === 'document' && isGifUrl;
   const isFileMessage = (msgType === 'image' || msgType === 'audio' || msgType === 'video' || msgType === 'document') && !isGifDocument;
 
@@ -622,6 +626,7 @@ export async function sendMessage(conversationId: string, messageData: IChatMess
       formData.append('messageId', messageData.id);
       if (messageData.parentMessageId) {
         formData.append('parentMessageId', messageData.parentMessageId);
+        formData.append('parentId', messageData.parentMessageId);
       }
 
       await axios.post('/api/v1/files/upload', formData, {
@@ -642,14 +647,13 @@ export async function sendMessage(conversationId: string, messageData: IChatMess
           text: isGifDocument ? 'gif' : messageData.body,
           type: isGifDocument ? 'document' : (msgType === 'gif' ? 'gif' : 'text'),
           attachments: messageData.attachments || [],
-          ...(messageData.parentMessageId && { 
+          ...(messageData.parentMessageId && {
             parentMessageId: messageData.parentMessageId,
-            replyTo: messageData.parentMessageId,
-            replyToMessageId: messageData.parentMessageId 
+            parentId: messageData.parentMessageId,
           }),
         });
         socketSent = true;
-        console.log('Message sent via socket');
+        console.log('Message sent via socket', messageData.parentMessageId ? `(reply to: ${messageData.parentMessageId})` : '');
       }
     } catch (socketError) {
       console.error('Socket sendMessage failed, falling back to HTTP API:', socketError);
@@ -662,10 +666,11 @@ export async function sendMessage(conversationId: string, messageData: IChatMess
         text: isGifDocument ? 'gif' : messageData.body,
         type: isGifDocument ? 'document' : (msgType === 'gif' ? 'gif' : 'text'),
         attachments: messageData.attachments || [],
-        ...(messageData.parentMessageId && { 
+        ...(messageData.parentMessageId && {
           parentMessageId: messageData.parentMessageId,
           replyTo: messageData.parentMessageId,
-          replyToMessageId: messageData.parentMessageId 
+          replyToMessageId: messageData.parentMessageId,
+          parentId: messageData.parentMessageId
         }),
       });
       console.log('Message sent via HTTP API fallback');
@@ -687,7 +692,7 @@ export async function sendMessage(conversationId: string, messageData: IChatMess
 
 export async function createConversation(conversationData: any) {
   let payload: any = {};
-  
+
   const senderId = conversationData.messages?.[0]?.senderId;
   const recipientUser = conversationData.participants.find((p: any) => p.id !== senderId);
 
@@ -844,9 +849,9 @@ export async function reactToMessage(messageId: string, emoji: string, conversat
               const updated = alreadyReacted
                 ? existing.filter((r) => !(r.senderId === currentUserId && r.emoji === emoji))
                 : [
-                    ...existing.filter((r) => r.senderId !== currentUserId),
-                    { emoji, senderId: currentUserId },
-                  ];
+                  ...existing.filter((r) => r.senderId !== currentUserId),
+                  { emoji, senderId: currentUserId },
+                ];
 
               return { ...m, reactions: updated };
             }),
@@ -942,7 +947,7 @@ export async function getMessageContext(conversationId: string, messageId: strin
 
 export function useGetMessageById(conversationId: string, messageId: string | undefined) {
   const { conversation } = useGetConversation(conversationId);
-  
+
   // Try to find in current conversation cache first
   const cachedMessage = useMemo(() => {
     if (!messageId || !conversation?.messages) return null;

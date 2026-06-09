@@ -50,13 +50,13 @@ type Props = {
 const isSystemMessage = (message: IChatMessage) => {
   const body = message.body || '';
   const contentType = message.contentType || '';
-  
+
   if (contentType === 'system' || contentType === 'notification') {
     return true;
   }
-  
+
   const lowerBody = body.toLowerCase();
-  
+
   return (
     lowerBody.includes('created by you') ||
     lowerBody.includes('created this group') ||
@@ -91,7 +91,16 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
   const { firstName, avatarUrl } = senderDetails;
   const { body, createdAt } = message;
 
-  const { message: parentMessage } = useGetMessageById(conversationId, message.parentMessageId);
+  const parentId =
+    message.parentMessageId ||
+    (message.parentMessage as any)?._id ||
+    (message.parentMessage as any)?.messageId;
+
+  const { message: parentMessageFromApi } = useGetMessageById(conversationId, parentId);
+
+  // Prefer backend-provided populated parentMessage if available;
+  // otherwise fall back to context/API fetched parent message.
+  const parentMessage = (message as any).parentMessage || parentMessageFromApi;
 
   const handleJumpToParent = async () => {
     if (!message.parentMessageId) return;
@@ -409,7 +418,7 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
         </Stack>
       ) : (
         <Stack spacing={1} sx={{ width: '100%' }}>
-          {parentMessage && (
+          {(parentMessage || message.parentMessage) && (
             <Box
               onClick={handleJumpToParent}
               sx={{
@@ -429,207 +438,209 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
                 {parentMessage.senderId === user?.id ? 'You' : (participants.find(p => p.id === parentMessage.senderId)?.name || 'User')}
               </Typography>
               <Typography variant="body2" noWrap sx={{ color: 'text.secondary', fontSize: '0.75rem' }}>
-                {parentMessage.body === 'gif' ? '[GIF]' : (parentMessage.body || 'File')}
+                {(parentMessage as any).body === 'gif'
+                  ? '[GIF]'
+                  : (((parentMessage as any).body ?? (parentMessage as any).text ?? (parentMessage as any).message ?? '') || 'File')}
               </Typography>
             </Box>
           )}
 
           {isGroupInvite && groupInviteData ? (
             <Stack spacing={1.5} sx={{ width: 260 }}>
-          <Stack direction="row" alignItems="center" spacing={1.5}>
-            <Avatar src={groupInviteData.groupAvatar} alt={groupInviteData.groupName} sx={{ width: 48, height: 48 }} />
-            <Stack spacing={0}>
-              <Typography variant="subtitle2">{groupInviteData.groupName || 'Group Chat'}</Typography>
-              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                {groupInviteData.memberCount || 0} members
-              </Typography>
-            </Stack>
-          </Stack>
-          <Button
-            variant="contained"
-            color="primary"
-            fullWidth
-            size="small"
-            onClick={async () => {
-              try {
-                const res = await joinGroupByLink(groupInviteData.inviteLink);
-                if (res?.status === 'pending' || res?.message?.toLowerCase().includes('request') || res?.data?.needsApproval || res?.needsApproval) {
-                  toast.success('Join request sent to group admins for approval.');
-                } else {
-                  toast.success('Joined group successfully!');
-                }
-              } catch (err: any) {
-                toast.error(err.message || err.error || 'Failed to join group. You might already be a member, or the link requires approval.');
-              }
-            }}
-          >
-            Join Group
-          </Button>
-        </Stack>
-      ) : hasImage ? (
-        <Box
-          component="img"
-          alt="attachment"
-          src={imageUrl}
-          onClick={() => onOpenLightbox(imageUrl)}
-          sx={{
-            width: 1,
-            maxWidth: { xs: 240, sm: 320, md: 400 },
-            height: 'auto',
-            borderRadius: 1.5,
-            cursor: 'pointer',
-            objectFit: 'cover',
-            aspectRatio: '16/11',
-            '&:hover': { opacity: 0.9 },
-          }}
-        />
-      ) : isAudio ? (
-        <Box sx={{ width: 280, pt: 1 }}>
-          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-          <audio controls src={audioUrl} style={{ width: '100%', height: 40, outline: 'none' }} />
-        </Box>
-      ) : message.attachments && message.attachments.length > 0 ? (
-        <Stack spacing={1} sx={{ width: 220, p: 0.5 }}>
-          {message.attachments.map((att, idx) => (
-            <Stack
-              key={att.name + idx}
-              spacing={1.5}
-              direction="row"
-              alignItems="center"
-              onClick={() => window.open(att.preview || att.path, '_blank')}
-              sx={{
-                p: 1,
-                borderRadius: 1,
-                cursor: 'pointer',
-                bgcolor: me ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.03)',
-                '&:hover': {
-                  bgcolor: me ? 'rgba(255, 255, 255, 0.16)' : 'rgba(0, 0, 0, 0.06)',
-                },
-              }}
-            >
-              <FileThumbnail
-                file={att.name}
-                slotProps={{ icon: { width: 24, height: 24 } }}
-                sx={{ width: 40, height: 40 }}
-              />
-
-              <Stack spacing={0.25} sx={{ minWidth: 0, flexGrow: 1 }}>
-                <Typography variant="subtitle2" noWrap sx={{ fontSize: '13px', color: me ? 'inherit' : 'text.primary' }}>
-                  {att.name}
-                </Typography>
-                <Typography variant="caption" sx={{ color: me ? 'rgba(255, 255, 255, 0.7)' : 'text.secondary', fontSize: '11px' }}>
-                  {fData(att.size)}
-                </Typography>
+              <Stack direction="row" alignItems="center" spacing={1.5}>
+                <Avatar src={groupInviteData.groupAvatar} alt={groupInviteData.groupName} sx={{ width: 48, height: 48 }} />
+                <Stack spacing={0}>
+                  <Typography variant="subtitle2">{groupInviteData.groupName || 'Group Chat'}</Typography>
+                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                    {groupInviteData.memberCount || 0} members
+                  </Typography>
+                </Stack>
               </Stack>
-
-              <Iconify icon="solar:download-minimalistic-bold" width={20} sx={{ color: me ? 'inherit' : 'text.secondary' }} />
+              <Button
+                variant="contained"
+                color="primary"
+                fullWidth
+                size="small"
+                onClick={async () => {
+                  try {
+                    const res = await joinGroupByLink(groupInviteData.inviteLink);
+                    if (res?.status === 'pending' || res?.message?.toLowerCase().includes('request') || res?.data?.needsApproval || res?.needsApproval) {
+                      toast.success('Join request sent to group admins for approval.');
+                    } else {
+                      toast.success('Joined group successfully!');
+                    }
+                  } catch (err: any) {
+                    toast.error(err.message || err.error || 'Failed to join group. You might already be a member, or the link requires approval.');
+                  }
+                }}
+              >
+                Join Group
+              </Button>
             </Stack>
-          ))}
-        </Stack>
-      ) : (
-        <>
-          {(() => {
-            const renderTextWithLinks = (text: string) => {
-              const urlRegex = /(https?:\/\/[^\s]+)/g;
-              const parts = text.split(urlRegex);
-              return parts.map((part, i) => {
-                if (part.match(urlRegex)) {
-                  const inviteMatch = part.match(/\/group\/invite\/([^/]+)/);
-                  
-                  if (inviteMatch && inviteMatch[1]) {
-                    const code = inviteMatch[1];
-                    return (
+          ) : hasImage ? (
+            <Box
+              component="img"
+              alt="attachment"
+              src={imageUrl}
+              onClick={() => onOpenLightbox(imageUrl)}
+              sx={{
+                width: 1,
+                maxWidth: { xs: 240, sm: 320, md: 400 },
+                height: 'auto',
+                borderRadius: 1.5,
+                cursor: 'pointer',
+                objectFit: 'cover',
+                aspectRatio: '16/11',
+                '&:hover': { opacity: 0.9 },
+              }}
+            />
+          ) : isAudio ? (
+            <Box sx={{ width: 280, pt: 1 }}>
+              {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+              <audio controls src={audioUrl} style={{ width: '100%', height: 40, outline: 'none' }} />
+            </Box>
+          ) : message.attachments && message.attachments.length > 0 ? (
+            <Stack spacing={1} sx={{ width: 220, p: 0.5 }}>
+              {message.attachments.map((att, idx) => (
+                <Stack
+                  key={att.name + idx}
+                  spacing={1.5}
+                  direction="row"
+                  alignItems="center"
+                  onClick={() => window.open(att.preview || att.path, '_blank')}
+                  sx={{
+                    p: 1,
+                    borderRadius: 1,
+                    cursor: 'pointer',
+                    bgcolor: me ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.03)',
+                    '&:hover': {
+                      bgcolor: me ? 'rgba(255, 255, 255, 0.16)' : 'rgba(0, 0, 0, 0.06)',
+                    },
+                  }}
+                >
+                  <FileThumbnail
+                    file={att.name}
+                    slotProps={{ icon: { width: 24, height: 24 } }}
+                    sx={{ width: 40, height: 40 }}
+                  />
+
+                  <Stack spacing={0.25} sx={{ minWidth: 0, flexGrow: 1 }}>
+                    <Typography variant="subtitle2" noWrap sx={{ fontSize: '13px', color: me ? 'inherit' : 'text.primary' }}>
+                      {att.name}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: me ? 'rgba(255, 255, 255, 0.7)' : 'text.secondary', fontSize: '11px' }}>
+                      {fData(att.size)}
+                    </Typography>
+                  </Stack>
+
+                  <Iconify icon="solar:download-minimalistic-bold" width={20} sx={{ color: me ? 'inherit' : 'text.secondary' }} />
+                </Stack>
+              ))}
+            </Stack>
+          ) : (
+            <>
+              {(() => {
+                const renderTextWithLinks = (text: string) => {
+                  const urlRegex = /(https?:\/\/[^\s]+)/g;
+                  const parts = text.split(urlRegex);
+                  return parts.map((part, i) => {
+                    if (part.match(urlRegex)) {
+                      const inviteMatch = part.match(/\/group\/invite\/([^/]+)/);
+
+                      if (inviteMatch && inviteMatch[1]) {
+                        const code = inviteMatch[1];
+                        return (
+                          <Box
+                            component="span"
+                            key={i}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              setInviteModalCode(code);
+                            }}
+                            sx={{
+                              cursor: 'pointer',
+                              color: me ? 'inherit' : 'primary.main',
+                              textDecoration: 'underline',
+                              wordBreak: 'break-all',
+                              '&:hover': { opacity: 0.8 },
+                            }}
+                          >
+                            {part}
+                          </Box>
+                        );
+                      }
+
+                      return (
+                        <Box
+                          component="a"
+                          key={i}
+                          href={part}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          sx={{
+                            color: me ? 'inherit' : 'primary.main',
+                            textDecoration: 'underline',
+                            wordBreak: 'break-all',
+                            '&:hover': { opacity: 0.8 },
+                          }}
+                        >
+                          {part}
+                        </Box>
+                      );
+                    }
+                    return <span key={i}>{part}</span>;
+                  });
+                };
+
+                if (body.length > 300 && !isExpanded) {
+                  return (
+                    <>
+                      {renderTextWithLinks(body.slice(0, 300))}...{' '}
                       <Box
                         component="span"
-                        key={i}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          e.preventDefault();
-                          setInviteModalCode(code);
-                        }}
+                        onClick={() => setIsExpanded(true)}
                         sx={{
-                          cursor: 'pointer',
                           color: me ? 'inherit' : 'primary.main',
-                          textDecoration: 'underline',
-                          wordBreak: 'break-all',
-                          '&:hover': { opacity: 0.8 },
+                          fontWeight: 'bold',
+                          cursor: 'pointer',
+                          textDecoration: 'none',
+                          '&:hover': { textDecoration: 'underline' },
                         }}
                       >
-                        {part}
+                        Read more
                       </Box>
-                    );
-                  }
-
-                  return (
-                    <Box
-                      component="a"
-                      key={i}
-                      href={part}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      sx={{
-                        color: me ? 'inherit' : 'primary.main',
-                        textDecoration: 'underline',
-                        wordBreak: 'break-all',
-                        '&:hover': { opacity: 0.8 },
-                      }}
-                    >
-                      {part}
-                    </Box>
+                    </>
                   );
                 }
-                return <span key={i}>{part}</span>;
-              });
-            };
-
-            if (body.length > 300 && !isExpanded) {
-              return (
-                <>
-                  {renderTextWithLinks(body.slice(0, 300))}...{' '}
-                  <Box
-                    component="span"
-                    onClick={() => setIsExpanded(true)}
-                    sx={{
-                      color: me ? 'inherit' : 'primary.main',
-                      fontWeight: 'bold',
-                      cursor: 'pointer',
-                      textDecoration: 'none',
-                      '&:hover': { textDecoration: 'underline' },
-                    }}
-                  >
-                    Read more
-                  </Box>
-                </>
-              );
-            }
-            if (body.length > 300) {
-              return (
-                <>
-                  {renderTextWithLinks(body)}{' '}
-                  <Box
-                    component="span"
-                    onClick={() => setIsExpanded(false)}
-                    sx={{
-                      color: me ? 'inherit' : 'primary.main',
-                      fontWeight: 'bold',
-                      cursor: 'pointer',
-                      textDecoration: 'none',
-                      '&:hover': { textDecoration: 'underline' },
-                      display: 'inline-block',
-                      ml: 0.5,
-                    }}
-                  >
-                    Read less
-                  </Box>
-                </>
-              );
-            }
-            return renderTextWithLinks(body);
-          })()}
-        </>
+                if (body.length > 300) {
+                  return (
+                    <>
+                      {renderTextWithLinks(body)}{' '}
+                      <Box
+                        component="span"
+                        onClick={() => setIsExpanded(false)}
+                        sx={{
+                          color: me ? 'inherit' : 'primary.main',
+                          fontWeight: 'bold',
+                          cursor: 'pointer',
+                          textDecoration: 'none',
+                          '&:hover': { textDecoration: 'underline' },
+                          display: 'inline-block',
+                          ml: 0.5,
+                        }}
+                      >
+                        Read less
+                      </Box>
+                    </>
+                  );
+                }
+                return renderTextWithLinks(body);
+              })()}
+            </>
+          )}
+        </Stack>
       )}
-      </Stack>
-    )}
     </Stack>
   );
 

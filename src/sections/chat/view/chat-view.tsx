@@ -18,6 +18,7 @@ import { useGroupSockets } from 'src/hooks/use-group-sockets';
 import { fToNow } from 'src/utils/format-time';
 
 import { CONFIG } from 'src/config-global';
+import { useGetGroups } from 'src/actions/group';
 import { useChatStore } from 'src/store/useChatStore';
 import { 
   useGetContacts,
@@ -147,11 +148,54 @@ export function ChatView() {
     )
     : [];
 
-  const isUserMember = conversation
-    ? conversation.participants.some(
+  const { groups, groupsLoading } = useGetGroups();
+
+  const isUserMember = useMemo(() => {
+    if (!conversation) return true;
+    
+    const inParticipants = conversation.participants.some(
       (participant: any) => (participant.id || participant._id) === `${user?.id}`
-    )
-    : true;
+    );
+
+    const convType = conversation.type?.toLowerCase() || '';
+    const isGroupConv = 
+      convType === 'group' || 
+      conversation.participants.length > 2 ||
+      groups.some((g: any) => 
+        g.conversationId?._id === selectedConversationId || 
+        g.conversationId === selectedConversationId ||
+        g._id === selectedConversationId ||
+        g.id === selectedConversationId
+      );
+
+    if (isGroupConv) {
+      if (groupsLoading && inParticipants) {
+        return true; // Prevent flicker while loading
+      }
+      
+      const currentGroup = groups.find((g: any) => 
+        g.conversationId?._id === selectedConversationId || 
+        g.conversationId === selectedConversationId ||
+        g._id === selectedConversationId ||
+        g.id === selectedConversationId
+      );
+      
+      if (!currentGroup && !groupsLoading) {
+        return false;
+      }
+
+      if (currentGroup) {
+        const isAdmin = (currentGroup.admins || []).some((a: any) => (a.id || a._id || a) === user?.id);
+        const isMember = (currentGroup.members || []).some((m: any) => (m.id || m._id || m) === user?.id);
+        
+        if (!isAdmin && !isMember) {
+          return false;
+        }
+      }
+    }
+
+    return inParticipants;
+  }, [conversation, user?.id, groups, groupsLoading, selectedConversationId]);
 
   useEffect(() => {
     setActiveConversation(selectedConversationId || null);

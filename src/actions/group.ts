@@ -303,20 +303,35 @@ export async function updateDisappearingMessages(conversationId: string, mode: s
 export async function joinGroupByLink(inviteLinkOrCode: string) {
   try {
     let code = inviteLinkOrCode;
-    // Extract code if it's a full URL
-    const match = inviteLinkOrCode.match(/\/group\/invite\/([^/]+)/);
-    if (match && match[1]) {
-      code = match[1];
-    }
+    let extractedToken = '';
     
-    // The backend error "The data argument must be of type string... Received undefined"
-    // implies it's trying to hash something (like crypto.createHash('sha256').update(req.body.token)).
-    // So it expects the body to contain 'token' or 'inviteCode'.
-    const res = await axios.post('/api/v1/groups/join-by-link', { 
+    // Parse URL if it's a full URL
+    try {
+      const url = new URL(inviteLinkOrCode.startsWith('http') ? inviteLinkOrCode : `http://localhost${inviteLinkOrCode.startsWith('/') ? '' : '/'}${inviteLinkOrCode}`);
+      const match = url.pathname.match(/\/group\/invite\/([^/]+)/);
+      if (match && match[1]) {
+        code = match[1];
+      }
+      extractedToken = url.searchParams.get('token') || '';
+    } catch {
+      const match = inviteLinkOrCode.match(/\/group\/invite\/([^/?]+)/);
+      if (match && match[1]) {
+        code = match[1];
+      }
+    }
+
+    const payload: any = {
       inviteLink: code,
-      token: code,
       inviteCode: code
-    });
+    };
+    
+    if (extractedToken) {
+      payload.token = extractedToken;
+    } else {
+      payload.token = code;
+    }
+
+    const res = await axios.post('/api/v1/groups/join-by-link', payload);
     
     mutate('/api/v1/groups');
     mutate('/api/v1/chats/conversations');

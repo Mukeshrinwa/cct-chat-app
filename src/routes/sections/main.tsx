@@ -20,6 +20,7 @@ const Page404 = lazy(() => import('src/pages/error/404'));
 const BlankPage = lazy(() => import('src/pages/blank'));
 
 const GroupInvitePage = lazy(() => import('src/pages/group-invite'));
+const JoinPage = lazy(() => import('src/pages/join'));
 
 // ----------------------------------------------------------------------
 
@@ -65,6 +66,14 @@ export const mainRoutes = [
         element: (
           <SimpleLayout content={{ compact: true }}>
             <GroupInvitePage />
+          </SimpleLayout>
+        ),
+      },
+      {
+        path: 'join',
+        element: (
+          <SimpleLayout content={{ compact: true }}>
+            <JoinPage />
           </SimpleLayout>
         ),
       },

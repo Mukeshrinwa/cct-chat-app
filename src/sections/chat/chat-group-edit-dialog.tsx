@@ -45,6 +45,8 @@ import { Iconify } from 'src/components/iconify';
 
 import { useMockedUser } from 'src/auth/hooks';
 
+import { InviteList } from './invite/InviteList';
+import { InviteModal } from './invite/InviteModal';
 import { ChatShareInviteDialog } from './chat-share-invite-dialog';
 
 // ----------------------------------------------------------------------
@@ -92,6 +94,9 @@ export function ChatGroupEditDialog({ open, onClose, group }: Props) {
 
   // ── Share Invite ───────────────────────────────────────────────────
   const [shareOpen, setShareOpen] = useState(false);
+
+  // ── Invite Modal ───────────────────────────────────────────────────
+  const [inviteModalOpen, setInviteModalOpen] = useState(false);
 
   // ── Save / Delete ──────────────────────────────────────────────────
   const [saving, setSaving] = useState(false);
@@ -610,8 +615,33 @@ export function ChatGroupEditDialog({ open, onClose, group }: Props) {
           startIcon={<Iconify icon="solar:link-bold" width={18} />}
           fullWidth
         >
-          Generate Invite Link
+          Generate Basic Invite Link
         </LoadingButton>
+      )}
+
+      <Divider sx={{ my: 1 }} />
+      
+      <Box sx={{ mt: 2 }}>
+        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+          <Typography variant="subtitle2">Advanced Invites (Beta)</Typography>
+          <Button
+            size="small"
+            variant="soft"
+            onClick={() => setInviteModalOpen(true)}
+            startIcon={<Iconify icon="solar:plus-bold" width={16} />}
+          >
+            Create
+          </Button>
+        </Stack>
+        <InviteList roomId={group._id} />
+      </Box>
+
+      {inviteModalOpen && (
+        <InviteModal
+          open={inviteModalOpen}
+          onClose={() => setInviteModalOpen(false)}
+          roomId={group._id}
+        />
       )}
     </Stack>
   );

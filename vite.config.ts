@@ -6,7 +6,7 @@ import react from '@vitejs/plugin-react-swc';
 
 // ----------------------------------------------------------------------
 
-const PORT = 8080;
+const PORT = 5001;
 
 const _env = loadEnv('all', process.cwd());
 

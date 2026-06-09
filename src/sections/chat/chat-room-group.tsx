@@ -1,3 +1,4 @@
+// Trigger HMR
 import type { IChatParticipant } from 'src/types/chat';
 
 import { mutate } from 'swr';
@@ -29,10 +30,10 @@ import { useBoolean } from 'src/hooks/use-boolean';
 
 import { searchUsers } from 'src/api/user';
 import { useGroupStore } from 'src/store/useGroupStore';
+import { socketManager } from 'src/socket/socket-service';
 import {
   useGetGroups,
   leaveGroupById,
-  addMembersToGroup,
   rejectJoinRequest,
   useGetJoinRequests,
   approveJoinRequest,
@@ -220,10 +221,10 @@ export function ChatRoomGroup({ participants, isUserMember = true }: Props) {
 
     try {
       setIsAddingMembers(true);
-      await addMembersToGroup(
-        groupId,
-        membersToAdd.map((member) => member.id)
-      );
+      const newMemberIds = membersToAdd.map((member) => member.id);
+      
+      // Emit socket event to notify backend and other clients
+      socketManager.addMembers({ groupId, members: newMemberIds });
 
       // ─── Optimistic update ──────────────────────────────────────────
       // Immediately patch the conversation SWR cache so the

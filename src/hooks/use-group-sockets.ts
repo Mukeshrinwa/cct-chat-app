@@ -216,6 +216,9 @@ export const useGroupSockets = (currentUserId: string | undefined) => {
 
     const handleAddedToGroup = (group: any) => {
       useGroupStore.getState().setGroup(getConversationId(group), group);
+      // Invalidate so the user sees the new group in their chat list
+      mutate('/api/v1/groups');
+      mutate('/api/v1/chats/conversations');
     };
 
 

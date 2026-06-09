@@ -391,7 +391,7 @@ export function ChatHeaderDetail({
           <Iconify icon={!collapseDesktop ? 'ri:sidebar-unfold-fill' : 'ri:sidebar-fold-fill'} />
         </IconButton>
 
-        <IconButton onClick={popover.onOpen} disabled={!isUserMember}>
+        <IconButton onClick={popover.onOpen}>
           <Iconify icon="eva:more-vertical-fill" />
         </IconButton>
       </Stack>
@@ -418,6 +418,7 @@ export function ChatHeaderDetail({
             ref={disappearingAnchorRef}
             onClick={disappearingPopover.onOpen}
             sx={{ justifyContent: 'space-between' }}
+            disabled={!isUserMember}
           >
             <Stack direction="row" alignItems="center" spacing={1}>
               <Iconify icon="solar:clock-circle-bold" />

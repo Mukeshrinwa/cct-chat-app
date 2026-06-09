@@ -25,6 +25,7 @@ import {
   clickConversation,
   getMessageContext, 
   useGetConversation, 
+  createConversation,
   useGetConversations,
   searchConversationMessages
 } from 'src/actions/chat';
@@ -217,7 +218,7 @@ export function ChatView() {
     }
   }, [conversation, selectedConversationId, router]);
 
-  const handleAddRecipients = useCallback((selected: IChatParticipant[]) => {
+  const handleAddRecipients = useCallback(async (selected: IChatParticipant[]) => {
     if (selected.length === 1) {
       const targetUser = selected[0];
       const existingId = conversations.allIds.find((cId: string) => {
@@ -229,6 +230,20 @@ export function ChatView() {
       if (existingId) {
         router.push(`${paths.dashboard.chat}?id=${existingId}`);
         return;
+      }
+
+      try {
+        const res = await createConversation({
+          participants: [targetUser],
+          type: 'direct'
+        });
+        if (res?.conversation?.id) {
+          router.push(`${paths.dashboard.chat}?id=${res.conversation.id}`);
+          setRecipients([]);
+          return;
+        }
+      } catch (err) {
+        console.error('Failed to create empty conversation:', err);
       }
     }
     setRecipients(selected);

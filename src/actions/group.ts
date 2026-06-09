@@ -75,7 +75,6 @@ export async function createGroup(groupData: { name: string; participants: strin
           participants: groupData.participants,
         });
         socketSent = true;
-        console.log('Group created via socket');
       }
     } catch (socketError) {
       console.error('Socket createGroup failed, falling back to HTTP API:', socketError);
@@ -90,7 +89,6 @@ export async function createGroup(groupData: { name: string; participants: strin
       // Step 1: Create the group
       const res = await axios.post('/api/v1/groups', payload);
       resData = res.data;
-      console.log('Group created via HTTP API');
 
       // Step 2: Upload the avatar if one was provided
       if (groupData.avatarFile) {
@@ -103,7 +101,6 @@ export async function createGroup(groupData: { name: string; participants: strin
           await axios.post(`/api/v1/groups/${newGroupId}/avatar`, formData, {
             headers: { 'Content-Type': 'multipart/form-data' },
           });
-          console.log('Group avatar uploaded via HTTP API');
         }
       }
     }
@@ -174,7 +171,6 @@ export async function addMembersToGroup(groupId: string, members: string[]) {
       if (socketService.isConnected()) {
         await socketService.emit('add_members', { groupId, members });
         socketSent = true;
-        console.log('[Group] add_members emitted via socket');
       }
     } catch (socketError) {
       console.warn('[Group] Socket add_members failed, falling back to HTTP:', socketError);
@@ -183,7 +179,6 @@ export async function addMembersToGroup(groupId: string, members: string[]) {
     // Fallback: REST API
     if (!socketSent) {
       await axios.post(`/api/v1/groups/${groupId}/add-member`, { members });
-      console.log('[Group] add_members sent via HTTP fallback');
     }
 
     // Invalidate SWR caches so UI reflects the updated member list

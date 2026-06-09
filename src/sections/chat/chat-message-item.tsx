@@ -1,5 +1,6 @@
 import type { IChatMessage, IChatParticipant } from 'src/types/chat';
 
+import { mutate } from 'swr';
 import { useState } from 'react';
 
 import Box from '@mui/material/Box';
@@ -17,14 +18,16 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import useMediaQuery from '@mui/material/useMediaQuery';
 
-import { useSearchParams } from 'src/routes/hooks';
+import { paths } from 'src/routes/paths';
+import { useRouter, useSearchParams } from 'src/routes/hooks';
 
 import { fToNow } from 'src/utils/format-time';
 import { fData } from 'src/utils/format-number';
 import { getMediaUrl } from 'src/utils/chat-utils';
 
 import { joinGroupByLink } from 'src/actions/group';
-import { editMessage, deleteMessage, reactToMessage } from 'src/actions/chat';
+import { useChatStore } from 'src/store/useChatStore';
+import { editMessage, deleteMessage, reactToMessage, useGetMessageById, getMessageContext } from 'src/actions/chat';
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
@@ -71,8 +74,10 @@ const isSystemMessage = (message: IChatMessage) => {
 export function ChatMessageItem({ message, participants, onOpenLightbox }: Props) {
   const { user } = useMockedUser();
   const theme = useTheme();
+  const setReplyingToMessage = useChatStore((state) => state.setReplyingToMessage);
 
   const searchParams = useSearchParams();
+  const router = useRouter();
   const conversationId = searchParams.get('id') || '';
   const highlightedMessageId = searchParams.get('messageId') || '';
   const isHighlighted = highlightedMessageId === message.id;
@@ -85,6 +90,34 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
 
   const { firstName, avatarUrl } = senderDetails;
   const { body, createdAt } = message;
+
+  const { message: parentMessage } = useGetMessageById(conversationId, message.parentMessageId);
+
+  const handleJumpToParent = async () => {
+    if (!message.parentMessageId) return;
+    router.push(`${paths.dashboard.chat}?id=${conversationId}&messageId=${message.parentMessageId}`);
+    try {
+      const contextMessages = await getMessageContext(conversationId, message.parentMessageId);
+      if (contextMessages && contextMessages.length > 0) {
+        mutate(
+          `/api/v1/chats/conversations/${conversationId}`,
+          (currentData: any) => {
+            if (!currentData) return currentData;
+            return {
+              ...currentData,
+              conversation: {
+                ...currentData.conversation,
+                messages: contextMessages,
+              },
+            };
+          },
+          { revalidate: false }
+        );
+      }
+    } catch (err) {
+      console.error('Failed to load message context:', err);
+    }
+  };
 
   const imageUrl = message.attachments?.[0]?.preview || getMediaUrl(body);
 
@@ -374,8 +407,35 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
             </IconButton>
           </Stack>
         </Stack>
-      ) : isGroupInvite && groupInviteData ? (
-        <Stack spacing={1.5} sx={{ width: 260 }}>
+      ) : (
+        <Stack spacing={1} sx={{ width: '100%' }}>
+          {parentMessage && (
+            <Box
+              onClick={handleJumpToParent}
+              sx={{
+                p: 1,
+                borderRadius: 1,
+                bgcolor: me ? 'rgba(255, 255, 255, 0.4)' : 'rgba(0, 0, 0, 0.04)',
+                borderLeft: (t) => `4px solid ${t.vars.palette.primary.main}`,
+                cursor: 'pointer',
+                opacity: 0.9,
+                '&:hover': { opacity: 1 },
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 0.5,
+              }}
+            >
+              <Typography variant="caption" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                {parentMessage.senderId === user?.id ? 'You' : (participants.find(p => p.id === parentMessage.senderId)?.name || 'User')}
+              </Typography>
+              <Typography variant="body2" noWrap sx={{ color: 'text.secondary', fontSize: '0.75rem' }}>
+                {parentMessage.body === 'gif' ? '[GIF]' : (parentMessage.body || 'File')}
+              </Typography>
+            </Box>
+          )}
+
+          {isGroupInvite && groupInviteData ? (
+            <Stack spacing={1.5} sx={{ width: 260 }}>
           <Stack direction="row" alignItems="center" spacing={1.5}>
             <Avatar src={groupInviteData.groupAvatar} alt={groupInviteData.groupName} sx={{ width: 48, height: 48 }} />
             <Stack spacing={0}>
@@ -568,6 +628,8 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
           })()}
         </>
       )}
+      </Stack>
+    )}
     </Stack>
   );
 
@@ -589,6 +651,10 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
         left: me ? -112 : 'unset',
       }}
     >
+      <IconButton size="small" onClick={() => setReplyingToMessage(message)}>
+        <Iconify icon="solar:reply-bold" width={16} />
+      </IconButton>
+
       <IconButton size="small" onClick={() => setForwardDialogOpen(true)}>
         <Iconify icon="solar:share-bold" width={16} />
       </IconButton>
@@ -783,6 +849,20 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
       </Stack>
 
       <Stack spacing={0.5}>
+        <Button
+          fullWidth
+          variant="text"
+          color="inherit"
+          startIcon={<Iconify icon="solar:reply-bold" width={20} />}
+          onClick={() => {
+            setReplyingToMessage(message);
+            handleCloseMobileActions();
+          }}
+          sx={{ justifyContent: 'flex-start', py: 1 }}
+        >
+          Reply
+        </Button>
+
         <Button
           fullWidth
           variant="text"

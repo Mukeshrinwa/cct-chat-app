@@ -97,6 +97,7 @@ export function SocketProvider({ children }: SocketProviderProps) {
     if (socketInstance && isConnected && activeConversationId) {
       console.log(`[SOCKET_EXPLICIT_JOIN] Emitting join_conversation room: ${activeConversationId}`);
       socketInstance.emit('join_conversation', { conversationId: activeConversationId });
+      socketInstance.emit('join_conversation_screen', { conversationId: activeConversationId });
       socketInstance.emit('mark_read', { conversationId: activeConversationId });
     }
   }, [activeConversationId, isConnected]);
@@ -264,6 +265,7 @@ export function SocketProvider({ children }: SocketProviderProps) {
         isDeleted: normalized.isDeletedForEveryone || false,
         reactions: normalized.reactions || [],
         status: normalized.status || data.status || 'sent',
+        parentMessageId: normalized.parentMessageId || undefined,
       };
 
       if (conversationId) {

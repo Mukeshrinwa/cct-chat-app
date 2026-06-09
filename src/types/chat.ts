@@ -23,6 +23,7 @@ export type IChatMessage = {
   attachments: IChatAttachment[];
   isDeleted?: boolean;
   deleteType?: 'everyone' | 'me';
+  parentMessageId?: string;
   reactions?: Array<{ emoji: string; senderId: string; username?: string }>;
   editedAt?: IDateValue;
   status?: 'sent' | 'delivered' | 'read';

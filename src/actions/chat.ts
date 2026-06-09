@@ -620,6 +620,9 @@ export async function sendMessage(conversationId: string, messageData: IChatMess
       formData.append('file', file);
       formData.append('conversationId', realConvId);
       formData.append('messageId', messageData.id);
+      if (messageData.parentMessageId) {
+        formData.append('parentMessageId', messageData.parentMessageId);
+      }
 
       await axios.post('/api/v1/files/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -639,6 +642,11 @@ export async function sendMessage(conversationId: string, messageData: IChatMess
           text: isGifDocument ? 'gif' : messageData.body,
           type: isGifDocument ? 'document' : (msgType === 'gif' ? 'gif' : 'text'),
           attachments: messageData.attachments || [],
+          ...(messageData.parentMessageId && { 
+            parentMessageId: messageData.parentMessageId,
+            replyTo: messageData.parentMessageId,
+            replyToMessageId: messageData.parentMessageId 
+          }),
         });
         socketSent = true;
         console.log('Message sent via socket');
@@ -654,6 +662,11 @@ export async function sendMessage(conversationId: string, messageData: IChatMess
         text: isGifDocument ? 'gif' : messageData.body,
         type: isGifDocument ? 'document' : (msgType === 'gif' ? 'gif' : 'text'),
         attachments: messageData.attachments || [],
+        ...(messageData.parentMessageId && { 
+          parentMessageId: messageData.parentMessageId,
+          replyTo: messageData.parentMessageId,
+          replyToMessageId: messageData.parentMessageId 
+        }),
       });
       console.log('Message sent via HTTP API fallback');
     }
@@ -896,6 +909,7 @@ function mapBackendMessageToChatMessage(msg: any): IChatMessage {
     reactions: normalized?.reactions || [],
     editedAt: msg.editedAt,
     status: normalized?.status || msg.status || 'sent',
+    parentMessageId: normalized?.parentMessageId || undefined,
     conversationId: normalized?.conversationId,
     conversationDetails: normalized?.conversationDetails,
     senderDetails: (normalized as any)?.senderDetails || msg.senderDetails,
@@ -924,6 +938,32 @@ export async function getMessageContext(conversationId: string, messageId: strin
   const res = await axios.get(`/api/v1/chats/messages/${conversationId}/context/${messageId}`);
   const data = res.data?.data || res.data || [];
   return Array.isArray(data) ? data.map(mapBackendMessageToChatMessage) : [];
+}
+
+export function useGetMessageById(conversationId: string, messageId: string | undefined) {
+  const { conversation } = useGetConversation(conversationId);
+  
+  // Try to find in current conversation cache first
+  const cachedMessage = useMemo(() => {
+    if (!messageId || !conversation?.messages) return null;
+    return conversation.messages.find((m: any) => m.id === messageId || m._id === messageId);
+  }, [conversation?.messages, messageId]);
+
+  // If not found in cache, fetch using context API
+  const url = (!cachedMessage && messageId && conversationId) ? `/api/v1/chats/messages/${conversationId}/context/${messageId}` : null;
+  const { data, isLoading } = useSWR(url, fetcher, swrOptions);
+
+  const fetchedMessage = useMemo(() => {
+    if (!data) return null;
+    const messagesArray = data.data || data || [];
+    const backendMessage = Array.isArray(messagesArray) ? messagesArray.find((m: any) => m._id === messageId || m.id === messageId || m.messageId === messageId) : null;
+    return backendMessage ? mapBackendMessageToChatMessage(backendMessage) : null;
+  }, [data, messageId]);
+
+  return {
+    message: cachedMessage || fetchedMessage,
+    isLoading: !cachedMessage && isLoading,
+  };
 }
 
 // ----------------------------------------------------------------------

@@ -20,6 +20,7 @@ import { uuidv4 } from 'src/utils/uuidv4';
 import { fSub, today } from 'src/utils/format-time';
 
 import { useSocket } from 'src/socket';
+import { useChatStore } from 'src/store/useChatStore';
 import { sendMessage, createConversation } from 'src/actions/chat';
 
 import { toast } from 'src/components/snackbar';
@@ -78,6 +79,9 @@ export function ChatMessageInput({
   const router = useRouter();
 
   const { startTyping, stopTyping, startRecording, stopRecording } = useSocket();
+
+  const replyingToMessage = useChatStore((state) => state.replyingToMessage);
+  const setReplyingToMessage = useChatStore((state) => state.setReplyingToMessage);
 
   const lastTypingTimeRef = useRef<number>(0);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -293,8 +297,9 @@ export function ChatMessageInput({
       contentType: 'text',
       createdAt: fSub({ minutes: 1 }),
       senderId: myContact.id,
+      ...(replyingToMessage && { parentMessageId: replyingToMessage.messageId || replyingToMessage.id || replyingToMessage._id }),
     }),
-    [message, myContact.id]
+    [message, myContact.id, replyingToMessage]
   );
 
   const conversationData = useMemo(
@@ -366,11 +371,12 @@ export function ChatMessageInput({
           onAddRecipients([]);
         }
         setMessage('');
+        setReplyingToMessage(null);
       }
     } catch (error) {
       console.error(error);
     }
-  }, [conversationData, message, messageData, onAddRecipients, router, selectedConversationId]);
+  }, [conversationData, message, messageData, onAddRecipients, router, selectedConversationId, setReplyingToMessage]);
 
   const handleSendMessage = useCallback(
     async (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -504,8 +510,47 @@ export function ChatMessageInput({
     onSubmitMessage();
   }, [onSubmitMessage]);
 
+  const handleCancelReply = useCallback(() => {
+    setReplyingToMessage(null);
+  }, [setReplyingToMessage]);
+
   return (
-    <>
+    <Stack sx={{ position: 'relative' }}>
+      {replyingToMessage && (
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="space-between"
+          sx={{
+            p: 1.5,
+            borderTop: (theme) => `solid 1px ${theme.vars.palette.divider}`,
+            bgcolor: 'background.neutral',
+            mx: 1,
+            mt: 1,
+            borderRadius: 1,
+          }}
+        >
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <Iconify icon="solar:reply-bold" sx={{ color: 'text.secondary' }} />
+            <Stack>
+              <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 'bold' }}>
+                Replying to {replyingToMessage.senderId === myContact.id ? 'yourself' : 'message'}
+              </Typography>
+              <Typography
+                variant="body2"
+                noWrap
+                sx={{ color: 'text.primary', maxWidth: 300 }}
+              >
+                {replyingToMessage.body === 'gif' ? '[GIF]' : (replyingToMessage.body || 'File')}
+              </Typography>
+            </Stack>
+          </Stack>
+          <IconButton size="small" onClick={handleCancelReply}>
+            <Iconify icon="mingcute:close-line" width={16} />
+          </IconButton>
+        </Stack>
+      )}
+
       {isRecording ? (
         <Stack
           direction="row"
@@ -818,6 +863,6 @@ export function ChatMessageInput({
           </Stack>
         )}
       </Popover>
-    </>
+    </Stack>
   );
 }

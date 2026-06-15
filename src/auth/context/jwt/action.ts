@@ -5,7 +5,7 @@ import { setSession } from './utils';
 // ----------------------------------------------------------------------
 
 export type SignInParams = {
-  identifier: string;
+  username: string;
   password: string;
 };
 
@@ -108,17 +108,10 @@ export const signUp = async ({
 /** **************************************
  * Sign in
  *************************************** */
-export const signInWithPassword = async ({ identifier, password }: SignInParams): Promise<void> => {
+export const signInWithPassword = async ({ username, password }: SignInParams): Promise<void> => {
   try {
-    // Detect if identifier is a mobile number (starts with + or contains only digits)
-    const trimmed = identifier.trim();
-    const isMobile = /^\+?\d{7,15}$/.test(trimmed);
-
-    const finalIdentifier = trimmed;
-
-    const params = isMobile
-      ? { mobile: finalIdentifier, password }
-      : { username: trimmed, password };
+    const trimmed = username.trim();
+    const params = { username: trimmed, password };
 
     const res = await axios.post(endpoints.auth.signIn, params);
 

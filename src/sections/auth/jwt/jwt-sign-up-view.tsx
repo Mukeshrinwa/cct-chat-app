@@ -57,7 +57,7 @@ const ProfileSchema = zod.object({
     .string()
     .min(1, { message: 'Username is required!' })
     .min(3, { message: 'Username must be at least 3 characters!' })
-    .regex(/^[a-zA-Z0-9_]+$/, { message: 'Only letters, numbers, and underscores!' }),
+    .regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/, { message: 'Username cannot start with a number, and must only contain letters, numbers, and underscores!' }),
   password: zod
     .string()
     .min(1, { message: 'Password is required!' })

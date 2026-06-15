@@ -28,9 +28,11 @@ import { signInWithPassword } from 'src/auth/context/jwt';
 export type SignInSchemaType = zod.infer<typeof SignInSchema>;
 
 export const SignInSchema = zod.object({
-  identifier: zod
+  username: zod
     .string()
-    .min(1, { message: 'Username or Mobile number is required!' }),
+    .min(1, { message: 'Username is required!' })
+    .min(3, { message: 'Username must be at least 3 characters!' })
+    .regex(/^[a-zA-Z_][a-zA-Z0-9_]*$/, { message: 'Username cannot start with a number, and must only contain letters, numbers, and underscores!' }),
   password: zod
     .string()
     .min(1, { message: 'Password is required!' })
@@ -49,7 +51,7 @@ export function JwtSignInView() {
   const password = useBoolean();
 
   const defaultValues = {
-    identifier: '',
+    username: '',
     password: '',
   };
 
@@ -65,7 +67,7 @@ export function JwtSignInView() {
 
   const onSubmit = handleSubmit(async (data) => {
     try {
-      await signInWithPassword({ identifier: data.identifier, password: data.password });
+      await signInWithPassword({ username: data.username, password: data.password });
       await checkUserSession?.();
 
       router.refresh();
@@ -94,9 +96,9 @@ export function JwtSignInView() {
   const renderForm = (
     <Stack spacing={3}>
       <Field.Text
-        name="identifier"
-        label="Username or Mobile Number"
-        placeholder="Enter username or mobile number"
+        name="username"
+        label="Username"
+        placeholder="Enter username"
         InputLabelProps={{ shrink: true }}
       />
 

@@ -757,9 +757,11 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
         transition: (t) =>
           t.transitions.create(['opacity'], { duration: t.transitions.duration.shorter }),
         // Receiver: actions appear to the RIGHT of the bubble
-        right: me ? 'unset' : -112,
+        left: me ? 'unset' : '100%',
+        marginLeft: me ? 0 : '12px',
         // Sender: actions appear to the LEFT of the bubble
-        left: me ? -112 : 'unset',
+        right: me ? '100%' : 'unset',
+        marginRight: me ? '12px' : 0,
       }}
     >
       <IconButton size="small" onClick={() => setReplyingToMessage(message)}>

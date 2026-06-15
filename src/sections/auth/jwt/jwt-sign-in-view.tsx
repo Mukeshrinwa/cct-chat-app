@@ -1,3 +1,5 @@
+import type { ChangeEvent } from 'react';
+
 import { z as zod } from 'zod';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -11,7 +13,6 @@ import Typography from '@mui/material/Typography';
 import LoadingButton from '@mui/lab/LoadingButton';
 import InputAdornment from '@mui/material/InputAdornment';
 
-import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
 import { RouterLink } from 'src/routes/components';
 
@@ -81,7 +82,7 @@ export function JwtSignInView() {
     <Stack spacing={1.5} sx={{ mb: 5 }}>
       <Typography variant="h5">Sign in to your account</Typography>
 
-      <Stack direction="row" spacing={0.5}>
+      {/* <Stack direction="row" spacing={0.5}>
         <Typography variant="body2" sx={{ color: 'text.secondary' }}>
           {`Don't have an account?`}
         </Typography>
@@ -89,7 +90,7 @@ export function JwtSignInView() {
         <Link component={RouterLink} href={paths.auth.jwt.signUp} variant="subtitle2">
           Get started
         </Link>
-      </Stack>
+      </Stack> */}
     </Stack>
   );
 
@@ -100,6 +101,10 @@ export function JwtSignInView() {
         label="Username"
         placeholder="Enter username"
         InputLabelProps={{ shrink: true }}
+        onChange={(e: ChangeEvent<HTMLInputElement>) => {
+          const val = e.target.value.replace(/^\d+/, '');
+          methods.setValue('username', val, { shouldValidate: true });
+        }}
       />
 
       <Stack spacing={1.5}>

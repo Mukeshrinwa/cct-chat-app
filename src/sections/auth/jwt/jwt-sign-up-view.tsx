@@ -474,8 +474,9 @@ export function JwtSignUpView() {
                 endAdornment: renderUsernameAdornment(),
               }}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                profileForm.setValue('username', e.target.value, { shouldValidate: true });
-                handleCheckUsername(e.target.value);
+                const val = e.target.value.replace(/^\d+/, '');
+                profileForm.setValue('username', val, { shouldValidate: true });
+                handleCheckUsername(val);
               }}
             />
 

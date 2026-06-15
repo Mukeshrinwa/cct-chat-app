@@ -2,7 +2,6 @@
 import type { IChatParticipant } from 'src/types/chat';
 
 import { mutate } from 'swr';
-import { toast } from 'sonner';
 import { useRef, useMemo, useState, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
@@ -41,6 +40,7 @@ import {
   bulkHandleJoinRequests,
 } from 'src/actions/group';
 
+import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 import { ConfirmDialog } from 'src/components/custom-dialog';
 

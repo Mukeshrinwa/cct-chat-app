@@ -142,13 +142,17 @@ export function ChatHeaderDetail({
 
   const handleAudioCall = useCallback(() => {
     if (!participantIds.length) return;
-    startCall(participantIds, 'audio');
-  }, [participantIds, startCall]);
+    const recipientName = group ? currentGroup?.groupName : singleParticipant?.name;
+    const recipientAvatar = group ? currentGroup?.groupAvatar : singleParticipant?.avatarUrl;
+    startCall(participantIds, 'audio', recipientName, recipientAvatar);
+  }, [participantIds, startCall, group, currentGroup, singleParticipant]);
 
   const handleVideoCall = useCallback(() => {
     if (!participantIds.length) return;
-    startCall(participantIds, 'video');
-  }, [participantIds, startCall]);
+    const recipientName = group ? currentGroup?.groupName : singleParticipant?.name;
+    const recipientAvatar = group ? currentGroup?.groupAvatar : singleParticipant?.avatarUrl;
+    startCall(participantIds, 'video', recipientName, recipientAvatar);
+  }, [participantIds, startCall, group, currentGroup, singleParticipant]);
 
   const handleToggleBlock = useCallback(async () => {
     if (!singleParticipant?.id || blockLoading) return;

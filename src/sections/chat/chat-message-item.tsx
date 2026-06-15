@@ -71,6 +71,34 @@ const isSystemMessage = (message: IChatMessage) => {
   );
 };
 
+const checkIsImage = (msg: any) => {
+  if (!msg) return false;
+  const body = msg.body || msg.text || '';
+  const contentType = msg.contentType || msg.type || '';
+  const firstAttachmentUrl = msg.attachments?.[0]?.url || msg.attachments?.[0]?.preview || msg.attachments?.[0]?.path || '';
+  const firstAttachmentType = msg.attachments?.[0]?.type || '';
+
+  return (
+    contentType === 'image' ||
+    firstAttachmentType.startsWith('image/') ||
+    (typeof firstAttachmentUrl === 'string' &&
+      (/\.(jpeg|jpg|gif|png|webp)($|\?)/i.test(firstAttachmentUrl) || firstAttachmentUrl.includes('giphy.com'))) ||
+    (typeof body === 'string' &&
+      (body.startsWith('data:image/') ||
+        /\.(jpeg|jpg|gif|png|webp)($|\?)/i.test(body) || body.includes('giphy.com')))
+  );
+};
+
+const getImageUrl = (msg: any) => {
+  if (!msg) return '';
+  return (
+    msg.attachments?.[0]?.preview ||
+    msg.attachments?.[0]?.url ||
+    msg.attachments?.[0]?.path ||
+    (typeof msg.body === 'string' && (msg.body.startsWith('data:') || msg.body.startsWith('http')) ? msg.body : '')
+  );
+};
+
 export function ChatMessageItem({ message, participants, onOpenLightbox }: Props) {
   const { user } = useMockedUser();
   const theme = useTheme();
@@ -493,32 +521,56 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
         </Stack>
       ) : (
         <Stack spacing={1} sx={{ width: '100%' }}>
-          {(parentMessage || message.parentMessage) && (
-            <Box
-              onClick={handleJumpToParent}
-              sx={{
-                p: 1,
-                borderRadius: 1,
-                bgcolor: me ? 'rgba(255, 255, 255, 0.4)' : 'rgba(0, 0, 0, 0.04)',
-                borderLeft: (t) => `4px solid ${t.vars.palette.primary.main}`,
-                cursor: 'pointer',
-                opacity: 0.9,
-                '&:hover': { opacity: 1 },
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 0.5,
-              }}
-            >
-              <Typography variant="caption" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-                {parentMessage.senderId === user?.id ? 'You' : (participants.find(p => p.id === parentMessage.senderId)?.name || 'User')}
-              </Typography>
-              <Typography variant="body2" noWrap sx={{ color: 'text.secondary', fontSize: '0.75rem' }}>
-                {(parentMessage as any).body === 'gif'
-                  ? '[GIF]'
-                  : (((parentMessage as any).body ?? (parentMessage as any).text ?? (parentMessage as any).message ?? '') || 'File')}
-              </Typography>
-            </Box>
-          )}
+          {(parentMessage || message.parentMessage) && (() => {
+            const pm = parentMessage || message.parentMessage;
+            const isImage = checkIsImage(pm);
+            const imgUrl = getImageUrl(pm);
+            return (
+              <Box
+                onClick={handleJumpToParent}
+                sx={{
+                  p: 1,
+                  borderRadius: 1,
+                  bgcolor: me ? 'rgba(255, 255, 255, 0.4)' : 'rgba(0, 0, 0, 0.04)',
+                  borderLeft: (t) => `4px solid ${t.vars.palette.primary.main}`,
+                  cursor: 'pointer',
+                  opacity: 0.9,
+                  '&:hover': { opacity: 1 },
+                  display: 'flex',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 1,
+                }}
+              >
+                {isImage && imgUrl && (
+                  <Box
+                    component="img"
+                    src={imgUrl}
+                    alt="parent reply preview"
+                    sx={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 0.5,
+                      objectFit: 'cover',
+                      flexShrink: 0,
+                    }}
+                  />
+                )}
+                <Stack sx={{ minWidth: 0, flexGrow: 1 }}>
+                  <Typography variant="caption" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                    {pm.senderId === user?.id ? 'You' : (participants.find(p => p.id === pm.senderId)?.name || 'User')}
+                  </Typography>
+                  <Typography variant="body2" noWrap sx={{ color: 'text.secondary', fontSize: '0.75rem' }}>
+                    {isImage
+                      ? `📷 Photo${pm.body && !pm.body.startsWith('data:') && !pm.body.startsWith('http') ? `: ${pm.body}` : ''}`
+                      : pm.body === 'gif'
+                      ? '[GIF]'
+                      : ((pm.body ?? pm.text ?? pm.message ?? '') || 'File')}
+                  </Typography>
+                </Stack>
+              </Box>
+            );
+          })()}
 
           {isGroupInvite && groupInviteData ? (
             <Stack spacing={1.5} sx={{ width: 260 }}>

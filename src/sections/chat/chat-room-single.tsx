@@ -138,13 +138,13 @@ export function ChatRoomSingle({ participant }: Props) {
 
   const handleAudioCall = useCallback(() => {
     if (isMe || !participant?.id) return;
-    startCall([participant.id], 'audio');
-  }, [isMe, participant?.id, startCall]);
+    startCall([participant.id], 'audio', participant.name, participant.avatarUrl);
+  }, [isMe, participant?.id, participant?.name, participant?.avatarUrl, startCall]);
 
   const handleVideoCall = useCallback(() => {
     if (isMe || !participant?.id) return;
-    startCall([participant.id], 'video');
-  }, [isMe, participant?.id, startCall]);
+    startCall([participant.id], 'video', participant.name, participant.avatarUrl);
+  }, [isMe, participant?.id, participant?.name, participant?.avatarUrl, startCall]);
 
   const handleToggleBlock = useCallback(async () => {
     if (!participant?.id || blockLoading) return;

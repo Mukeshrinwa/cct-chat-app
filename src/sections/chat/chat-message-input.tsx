@@ -61,7 +61,33 @@ const POPULAR_GIFS = [
   { id: '8', title: 'Excited', url: 'https://media.giphy.com/media/1n4iuWZFnTeN6qvdpD/giphy.gif' },
 ];
 
-// ----------------------------------------------------------------------
+const checkIsImage = (msg: any) => {
+  if (!msg) return false;
+  const body = msg.body || msg.text || '';
+  const contentType = msg.contentType || msg.type || '';
+  const firstAttachmentUrl = msg.attachments?.[0]?.url || msg.attachments?.[0]?.preview || msg.attachments?.[0]?.path || '';
+  const firstAttachmentType = msg.attachments?.[0]?.type || '';
+
+  return (
+    contentType === 'image' ||
+    firstAttachmentType.startsWith('image/') ||
+    (typeof firstAttachmentUrl === 'string' &&
+      (/\.(jpeg|jpg|gif|png|webp)($|\?)/i.test(firstAttachmentUrl) || firstAttachmentUrl.includes('giphy.com'))) ||
+    (typeof body === 'string' &&
+      (body.startsWith('data:image/') ||
+        /\.(jpeg|jpg|gif|png|webp)($|\?)/i.test(body) || body.includes('giphy.com')))
+  );
+};
+
+const getImageUrl = (msg: any) => {
+  if (!msg) return '';
+  return (
+    msg.attachments?.[0]?.preview ||
+    msg.attachments?.[0]?.url ||
+    msg.attachments?.[0]?.path ||
+    (typeof msg.body === 'string' && (msg.body.startsWith('data:') || msg.body.startsWith('http')) ? msg.body : '')
+  );
+};
 
 type Props = {
   disabled: boolean;
@@ -620,6 +646,20 @@ export function ChatMessageInput({
         >
           <Stack direction="row" alignItems="center" spacing={1}>
             <Iconify icon="solar:reply-bold" sx={{ color: 'text.secondary' }} />
+            {checkIsImage(replyingToMessage) && getImageUrl(replyingToMessage) && (
+              <Box
+                component="img"
+                src={getImageUrl(replyingToMessage)}
+                alt="reply preview"
+                sx={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 0.5,
+                  objectFit: 'cover',
+                  mr: 0.5,
+                }}
+              />
+            )}
             <Stack>
               <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 'bold' }}>
                 Replying to {replyingToMessage.senderId === myContact.id ? 'yourself' : 'message'}
@@ -629,7 +669,9 @@ export function ChatMessageInput({
                 noWrap
                 sx={{ color: 'text.primary', maxWidth: 300 }}
               >
-                {replyingToMessage.body === 'gif' ? '[GIF]' : (replyingToMessage.body || 'File')}
+                {checkIsImage(replyingToMessage)
+                  ? `📷 Photo${replyingToMessage.body && !replyingToMessage.body.startsWith('data:') && !replyingToMessage.body.startsWith('http') ? `: ${replyingToMessage.body}` : ''}`
+                  : replyingToMessage.body === 'gif' ? '[GIF]' : (replyingToMessage.body || 'File')}
               </Typography>
             </Stack>
           </Stack>

@@ -1,7 +1,6 @@
 // @refresh reset
 import type { Socket } from 'socket.io-client';
 
-import { toast } from 'sonner';
 import { mutate, useSWRConfig } from 'swr';
 import React, { useMemo, useState, useEffect, useContext, createContext } from 'react';
 
@@ -11,6 +10,8 @@ import { normalizeMessage } from 'src/utils/chat-utils';
 import { clickConversation } from 'src/actions/chat';
 import { useAuthStore } from 'src/store/useAuthStore';
 import { useChatStore } from 'src/store/useChatStore';
+
+import { toast } from 'src/components/snackbar';
 
 import { useAuthContext } from 'src/auth/hooks';
 
@@ -223,6 +224,20 @@ export function SocketProvider({ children }: SocketProviderProps) {
       }
 
       const activeConvId = useChatStore.getState().activeConversationId;
+
+      // If we are looking at a recipient's user ID (temporary state), and we receive a message from them,
+      // update the active conversation ID to the new conversationId.
+      if (activeConvId && activeConvId === senderId && conversationId && conversationId !== activeConvId) {
+        console.log(`[FIRST_TIME_MESSAGE] Active ID was recipient ID: ${activeConvId}, updating to new conversation ID: ${conversationId}`);
+        useChatStore.getState().setActiveConversation(conversationId);
+        
+        // Update URL
+        const url = new URL(window.location.href);
+        url.searchParams.set('id', conversationId);
+        window.history.replaceState({}, '', url.pathname + url.search);
+        window.dispatchEvent(new Event('popstate'));
+      }
+
       const matchingConv = useChatStore
         .getState()
         .conversations.find((c) => c._id === conversationId);
@@ -349,8 +364,159 @@ export function SocketProvider({ children }: SocketProviderProps) {
           },
           { revalidate: false }
         );
+
+        // Force-refresh SWR caches in background
+        mutate('/api/v1/chats/conversations');
+        mutate(`/api/v1/chats/conversations/${conversationId}`);
       }
     });
+
+    // -----------------------------------------------------------------------
+    // MESSAGES UPDATED/EDITED
+    // -----------------------------------------------------------------------
+    const handleMessageUpdated = (data: any) => {
+      console.log('[SOCKET_EVENT_MESSAGE_UPDATED] Received message updated:', data);
+      const normalized = normalizeMessage(data);
+      if (!normalized) return;
+
+      const { conversationId, messageId } = normalized;
+      if (!conversationId) return;
+
+      const convCacheKey = `/api/v1/chats/conversations/${conversationId}`;
+      if (cache.get(convCacheKey)?.data !== undefined) {
+        mutate(
+          convCacheKey,
+          (current: any) => {
+            if (!current || !current.conversation) return current;
+            return {
+              ...current,
+              conversation: {
+                ...current.conversation,
+                messages: current.conversation.messages.map((m: any) =>
+                  (m.id === messageId || m._id === messageId || m.id === normalized._id)
+                    ? {
+                        ...m,
+                        body: normalized.text,
+                        attachments: normalized.attachments,
+                        editedAt: normalized.editedAt,
+                        isDeleted: normalized.isDeletedForEveryone,
+                        status: normalized.status,
+                        reactions: normalized.reactions,
+                      }
+                    : m
+                ),
+              },
+            };
+          },
+          { revalidate: false }
+        );
+      }
+
+      // Update conversations list cache last message if needed
+      mutate(
+        '/api/v1/chats/conversations',
+        (current: any) => {
+          if (!current || !current.data) return current;
+          return {
+            ...current,
+            data: current.data.map((c: any) => {
+              if (c._id === conversationId && (c.lastMessage?._id === messageId || c.lastMessage?._id === normalized._id)) {
+                return {
+                  ...c,
+                  lastMessage: {
+                    ...c.lastMessage,
+                    text: normalized.text,
+                    type: normalized.messageType,
+                  },
+                };
+              }
+              return c;
+            }),
+          };
+        },
+        { revalidate: false }
+      );
+    };
+
+    // -----------------------------------------------------------------------
+    // MESSAGES DELETED
+    // -----------------------------------------------------------------------
+    const handleMessageDeleted = (payload: { messageId: string; conversationId: string }) => {
+      console.log('[SOCKET_EVENT_MESSAGE_DELETED] Received message deleted:', payload);
+      const { messageId, conversationId } = payload;
+      if (!conversationId) return;
+
+      const convCacheKey = `/api/v1/chats/conversations/${conversationId}`;
+      if (cache.get(convCacheKey)?.data !== undefined) {
+        mutate(
+          convCacheKey,
+          (current: any) => {
+            if (!current || !current.conversation) return current;
+            return {
+              ...current,
+              conversation: {
+                ...current.conversation,
+                messages: current.conversation.messages.map((m: any) =>
+                  (m.id === messageId || m._id === messageId)
+                    ? {
+                        ...m,
+                        body: 'This message was deleted.',
+                        isDeleted: true,
+                        contentType: 'text',
+                      }
+                    : m
+                ),
+              },
+            };
+          },
+          { revalidate: false }
+        );
+      }
+
+      // Update conversations list last message if the deleted message was the last message
+      mutate(
+        '/api/v1/chats/conversations',
+        (current: any) => {
+          if (!current || !current.data) return current;
+          return {
+            ...current,
+            data: current.data.map((c: any) => {
+              if (c._id === conversationId && (c.lastMessage?._id === messageId || c.lastMessage?.messageId === messageId)) {
+                return {
+                  ...c,
+                  lastMessage: {
+                    ...c.lastMessage,
+                    text: 'This message was deleted.',
+                    isDeleted: true,
+                  },
+                };
+              }
+              return c;
+            }),
+          };
+        },
+        { revalidate: false }
+      );
+    };
+
+    // -----------------------------------------------------------------------
+    // NEW CONVERSATION
+    // -----------------------------------------------------------------------
+    const handleNewConversation = (data: any) => {
+      console.log('[SOCKET_EVENT_NEW_CONVERSATION] Received new conversation:', data);
+      mutate('/api/v1/chats/conversations');
+      if (data?._id || data?.id) {
+        const convId = data._id || data.id;
+        mutate(`/api/v1/chats/conversations/${convId}`);
+      }
+    };
+
+    socketInstance.on('message:updated', handleMessageUpdated);
+    socketInstance.on('message_updated', handleMessageUpdated);
+    socketInstance.on('message_edited', handleMessageUpdated);
+    socketInstance.on('message_deleted', handleMessageDeleted);
+    socketInstance.on('message:deleted', handleMessageDeleted);
+    socketInstance.on('new_conversation', handleNewConversation);
 
     // -----------------------------------------------------------------------
     // 5. MESSAGES - message_delivered
@@ -615,7 +781,7 @@ export function SocketProvider({ children }: SocketProviderProps) {
       console.log(`[BLOCK_UI_UPDATE] I blocked target user: ${payload.targetUserId}`);
       useAuthStore.getState().toggleBlockUser(payload.targetUserId, true);
 
-      const {conversations} = useChatStore.getState();
+      const { conversations } = useChatStore.getState();
       const directConv = conversations.find(
         (c) => !c.isGroup && c.otherUser?._id === payload.targetUserId
       );
@@ -623,14 +789,20 @@ export function SocketProvider({ children }: SocketProviderProps) {
         useChatStore.getState().setTypingUser(directConv._id, 'Someone', false);
       }
 
-      toast.error(`Blocked user ${payload.targetUserId}`);
+      const targetUser = conversations.find((c) => c.otherUser?._id === payload.targetUserId)?.otherUser;
+      const userName = targetUser?.name || 'User';
+      toast.success(`Blocked ${userName}`);
       mutate((_endpoints: any) => true);
     });
 
     socketInstance.on('user_unblocked', (payload: { targetUserId: string }) => {
       console.log(`[UNBLOCK_UI_UPDATE] I unblocked target user: ${payload.targetUserId}`);
       useAuthStore.getState().toggleBlockUser(payload.targetUserId, false);
-      toast.success(`Unblocked user ${payload.targetUserId}`);
+
+      const { conversations } = useChatStore.getState();
+      const targetUser = conversations.find((c) => c.otherUser?._id === payload.targetUserId)?.otherUser;
+      const userName = targetUser?.name || 'User';
+      toast.success(`Unblocked ${userName}`);
       mutate((_endpoints: any) => true);
     });
 
@@ -797,6 +969,12 @@ export function SocketProvider({ children }: SocketProviderProps) {
       socketInstance.off('presence_hidden');
       socketInstance.off('presence_restored');
       socketInstance.off('new_message');
+      socketInstance.off('message:updated', handleMessageUpdated);
+      socketInstance.off('message_updated', handleMessageUpdated);
+      socketInstance.off('message_edited', handleMessageUpdated);
+      socketInstance.off('message_deleted', handleMessageDeleted);
+      socketInstance.off('message:deleted', handleMessageDeleted);
+      socketInstance.off('new_conversation', handleNewConversation);
       socketInstance.off('message_delivered');
       socketInstance.off('user_typing');
       socketInstance.off('typing_start');
@@ -893,3 +1071,4 @@ export function SocketProvider({ children }: SocketProviderProps) {
 
   return <SocketContext.Provider value={memoizedValue}>{children}</SocketContext.Provider>;
 }
+// Force watcher refresh for caching issue.

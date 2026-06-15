@@ -111,7 +111,7 @@ export const signUp = async ({
 export const signInWithPassword = async ({ username, password }: SignInParams): Promise<void> => {
   try {
     const trimmed = username.trim();
-    const params = { username: trimmed, password };
+    const params = { username: trimmed, password, forceLogin: true };
 
     const res = await axios.post(endpoints.auth.signIn, params);
 

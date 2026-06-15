@@ -54,13 +54,13 @@ export function ChatRoomParticipantDialog({ participant, open, onClose }: Props)
   const handleAudioCall = () => {
     if (isMe) return;
     onClose();
-    startCall([participant.id], 'audio');
+    startCall([participant.id], 'audio', participant.name, participant.avatarUrl);
   };
 
   const handleVideoCall = () => {
     if (isMe) return;
     onClose();
-    startCall([participant.id], 'video');
+    startCall([participant.id], 'video', participant.name, participant.avatarUrl);
   };
 
   const handleEmail = () => {

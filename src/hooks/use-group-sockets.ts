@@ -35,8 +35,15 @@ export const useGroupSockets = (currentUserId: string | undefined) => {
     };
 
     const handleGroupCreated = (data: any) => {
+      console.log('[SOCKET_EVENT_GROUP_CREATED] Received group created:', data);
       const { conversation, group } = data;
-      useGroupStore.getState().setGroup(conversation._id, group);
+      const convId = conversation?._id || conversation?.id;
+      if (convId) {
+        useGroupStore.getState().setGroup(convId, group);
+        mutate('/api/v1/groups');
+        mutate('/api/v1/chats/conversations');
+        mutate(`/api/v1/chats/conversations/${convId}`);
+      }
     };
 
     const handleGroupUpdated = (data: any) => {
@@ -93,11 +100,6 @@ export const useGroupSockets = (currentUserId: string | undefined) => {
           },
           { revalidate: true } // background revalidate to stay in sync
         );
-        // ───────────────────────────────────────────────────────────────────
-
-        mutate('/api/v1/groups');
-        mutate(`/api/v1/groups/${group._id}`);
-        mutate('/api/v1/chats/conversations');
       }
 
       if (type === 'member_removed' || type === 'member_left') {
@@ -146,6 +148,16 @@ export const useGroupSockets = (currentUserId: string | undefined) => {
 
           useProfileStore.getState().closeContactDrawer();
         }
+      }
+
+      // Generic SWR revalidation for all types of updates
+      mutate('/api/v1/groups');
+      mutate('/api/v1/chats/conversations');
+      if (group._id) {
+        mutate(`/api/v1/groups/${group._id}`);
+      }
+      if (groupConvId) {
+        mutate(`/api/v1/chats/conversations/${groupConvId}`);
       }
     };
 
@@ -215,10 +227,15 @@ export const useGroupSockets = (currentUserId: string | undefined) => {
     };
 
     const handleAddedToGroup = (group: any) => {
-      useGroupStore.getState().setGroup(getConversationId(group), group);
+      console.log('[SOCKET_EVENT_ADDED_TO_GROUP] Received added to group:', group);
+      const convId = getConversationId(group);
+      useGroupStore.getState().setGroup(convId, group);
       // Invalidate so the user sees the new group in their chat list
       mutate('/api/v1/groups');
       mutate('/api/v1/chats/conversations');
+      if (convId) {
+        mutate(`/api/v1/chats/conversations/${convId}`);
+      }
     };
 
 
@@ -235,6 +252,22 @@ export const useGroupSockets = (currentUserId: string | undefined) => {
 
     const handleMessagesRead = (data: { conversationId: string; readBy: string }) => {
       useGroupRealtimeStore.getState().markMessagesRead(data.conversationId, data.readBy);
+    };
+
+    const handleMessageUpdated = (data: any) => {
+      console.log('[SOCKET_EVENT_MESSAGE_UPDATED_GROUP] Received group message updated:', data);
+      const isGroupConv = !!useGroupStore.getState().groups[data.conversationId];
+      if (isGroupConv) {
+        useGroupRealtimeStore.getState().updateMessage(data.conversationId, data);
+      }
+    };
+
+    const handleMessageDeleted = (data: { messageId: string; conversationId: string }) => {
+      console.log('[SOCKET_EVENT_MESSAGE_DELETED_GROUP] Received group message deleted:', data);
+      const isGroupConv = !!useGroupStore.getState().groups[data.conversationId];
+      if (isGroupConv) {
+        useGroupRealtimeStore.getState().removeMessage(data.conversationId, data.messageId);
+      }
     };
 
     // -----------------------------------------------------------------------
@@ -353,6 +386,11 @@ export const useGroupSockets = (currentUserId: string | undefined) => {
     socket.on('added_to_group', handleAddedToGroup);
     socket.on('new_message', handleNewMessage);
     socket.on('messages_read', handleMessagesRead);
+    socket.on('message:updated', handleMessageUpdated);
+    socket.on('message_updated', handleMessageUpdated);
+    socket.on('message_edited', handleMessageUpdated);
+    socket.on('message_deleted', handleMessageDeleted);
+    socket.on('message:deleted', handleMessageDeleted);
     socket.on('user_typing', handleUserTyping);
     socket.on('active_call_available', handleActiveCallAvailable);
     socket.on('group_call_started', handleGroupCallStarted);
@@ -375,6 +413,11 @@ export const useGroupSockets = (currentUserId: string | undefined) => {
       socket.off('added_to_group', handleAddedToGroup);
       socket.off('new_message', handleNewMessage);
       socket.off('messages_read', handleMessagesRead);
+      socket.off('message:updated', handleMessageUpdated);
+      socket.off('message_updated', handleMessageUpdated);
+      socket.off('message_edited', handleMessageUpdated);
+      socket.off('message_deleted', handleMessageDeleted);
+      socket.off('message:deleted', handleMessageDeleted);
       socket.off('user_typing', handleUserTyping);
       socket.off('active_call_available', handleActiveCallAvailable);
       socket.off('group_call_started', handleGroupCallStarted);

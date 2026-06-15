@@ -12,7 +12,6 @@
 
 import type { Room, LocalTrack, RemoteParticipant } from 'livekit-client';
 
-import { toast } from 'sonner';
 import {
   RoomEvent,
   createLocalTracks,
@@ -27,8 +26,11 @@ import React, {
   createContext,
 } from 'react';
 
+import { useChatStore } from 'src/store/useChatStore';
 import { socketService } from 'src/socket/socket-service';
 import { getCallHistory, sendCallWebhook } from 'src/api/call';
+
+import { toast } from 'src/components/snackbar';
 
 import { useAuthContext } from 'src/auth/hooks';
 
@@ -85,7 +87,7 @@ interface CallContextType {
   isScreenSharing: boolean;
 
   // Actions
-  startCall: (participants: string[], callType: CallType) => Promise<void>;
+  startCall: (participants: string[], callType: CallType, recipientName?: string, recipientAvatar?: string) => Promise<void>;
   acceptCall: () => Promise<void>;
   rejectCall: () => void;
   endCall: () => void;
@@ -319,7 +321,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
   // ----------------------------------------------------------------------
 
   const startCall = useCallback(
-    async (participants: string[], callType: CallType) => {
+    async (participants: string[], callType: CallType, recipientName?: string, recipientAvatar?: string) => {
       if (call.status !== 'idle') {
         toast.warning('Already in a call');
         return;
@@ -327,12 +329,31 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
 
       const payload = { participants, callType };
 
+      let displayName = recipientName;
+      let displayAvatar = recipientAvatar;
+
+      if (!displayName) {
+        const activeConvId = useChatStore.getState().activeConversationId;
+        const activeConv = useChatStore.getState().conversations.find((c) => c._id === activeConvId);
+        if (activeConv) {
+          if ((activeConv as any).isGroup) {
+            displayName = (activeConv as any).groupName || 'Group Call';
+            displayAvatar = (activeConv as any).groupAvatar || '';
+          } else {
+            displayName = (activeConv as any).otherUser?.name || 'User';
+            displayAvatar = (activeConv as any).otherUser?.avatarUrl || '';
+          }
+        } else {
+          displayName = 'User';
+        }
+      }
+
       setCall({
         ...DEFAULT_CALL,
         status: 'calling',
         callType,
         participants,
-        caller: { _id: currentUserId, name: user?.name || user?.displayName || 'You' },
+        caller: { _id: currentUserId, name: displayName || 'User', avatar: displayAvatar },
       });
 
       playOutgoingTone();
@@ -362,7 +383,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
         }
       }
     },
-    [call.status, currentUserId, user, playOutgoingTone, stopOutgoingTone, resetCall]
+    [call.status, currentUserId, playOutgoingTone, stopOutgoingTone, resetCall]
   );
 
   // ----------------------------------------------------------------------

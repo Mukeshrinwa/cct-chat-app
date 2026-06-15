@@ -788,9 +788,17 @@ export async function clickConversation(conversationId: string) {
 
 export async function deleteMessage(messageId: string, deleteType: 'everyone' | 'me', conversationId?: string) {
   try {
+    const mappedDeleteType = deleteType === 'me' ? 'for_me' : 'for_everyone';
     await axios.delete(`/api/v1/chats/message/${messageId}`, {
       data: { deleteType },
     });
+    if (socketService.isConnected()) {
+      socketService.emit('message:delete', {
+        messageId,
+        deleteType: mappedDeleteType,
+      });
+      console.log('[SOCKET_EMIT] message:delete sent');
+    }
     if (conversationId) {
       mutate(`/api/v1/chats/conversations/${conversationId}`);
     }
@@ -809,6 +817,14 @@ export async function editMessage(messageId: string, text: string, attachments: 
       text,
       attachments,
     });
+    if (socketService.isConnected()) {
+      socketService.emit('message:edit', {
+        messageId,
+        text,
+        attachments,
+      });
+      console.log('[SOCKET_EMIT] message:edit sent');
+    }
     if (conversationId) {
       mutate(`/api/v1/chats/conversations/${conversationId}`);
     }

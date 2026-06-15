@@ -91,6 +91,82 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
   const { firstName, avatarUrl } = senderDetails;
   const { body, createdAt } = message;
 
+  const imageUrl = message.attachments?.[0]?.preview || getMediaUrl(body);
+
+  const getCaptionText = () => {
+    if (!body || typeof body !== 'string') return '';
+    const cleanBody = body.trim();
+    if (cleanBody.startsWith('data:image/') || cleanBody.startsWith('data:audio/')) return '';
+    if (cleanBody === 'gif') return '';
+    if (cleanBody === imageUrl) return '';
+    
+    const att = message.attachments?.[0];
+    if (att) {
+      if (cleanBody === att.preview || cleanBody === att.url || cleanBody === att.path) return '';
+    }
+    
+    if (/^https?:\/\/.*\.(jpeg|jpg|gif|png|webp)/i.test(cleanBody)) {
+      return '';
+    }
+    
+    return body;
+  };
+
+  const captionText = getCaptionText();
+
+  const renderTextWithLinks = (text: string) => {
+    const urlRegex = /(https?:\/\/[^\s]+)/g;
+    const parts = text.split(urlRegex);
+    return parts.map((part, i) => {
+      if (part.match(urlRegex)) {
+        const inviteMatch = part.match(/\/group\/invite\/([^/]+)/);
+
+        if (inviteMatch && inviteMatch[1]) {
+          const code = inviteMatch[1];
+          return (
+            <Box
+              component="span"
+              key={i}
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                setInviteModalCode(code);
+              }}
+              sx={{
+                cursor: 'pointer',
+                color: me ? 'inherit' : 'primary.main',
+                textDecoration: 'underline',
+                wordBreak: 'break-all',
+                '&:hover': { opacity: 0.8 },
+              }}
+            >
+              {part}
+            </Box>
+          );
+        }
+
+        return (
+          <Box
+            component="a"
+            key={i}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            sx={{
+              color: me ? 'inherit' : 'primary.main',
+              textDecoration: 'underline',
+              wordBreak: 'break-all',
+              '&:hover': { opacity: 0.8 },
+            }}
+          >
+            {part}
+          </Box>
+        );
+      }
+      return <span key={i}>{part}</span>;
+    });
+  };
+
   const parentId =
     message.parentMessageId ||
     (message.parentMessage as any)?._id ||
@@ -127,8 +203,6 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
       console.error('Failed to load message context:', err);
     }
   };
-
-  const imageUrl = message.attachments?.[0]?.preview || getMediaUrl(body);
 
   const isAudio =
     message.contentType === 'audio' ||
@@ -353,7 +427,8 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
         wordBreak: 'break-word',
         whiteSpace: 'pre-wrap',
         ...(me && { color: 'grey.800', bgcolor: 'primary.lighter' }),
-        ...(hasImage && { p: 0, bgcolor: 'transparent' }),
+        ...(hasImage && !captionText && { p: 0, bgcolor: 'transparent' }),
+        ...(hasImage && captionText && { p: 0.75 }),
         ...(message.isDeleted && {
           color: 'text.disabled',
           fontStyle: 'italic',
@@ -478,22 +553,36 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
               </Button>
             </Stack>
           ) : hasImage ? (
-            <Box
-              component="img"
-              alt="attachment"
-              src={imageUrl}
-              onClick={() => onOpenLightbox(imageUrl)}
-              sx={{
-                width: 1,
-                maxWidth: { xs: 240, sm: 320, md: 400 },
-                height: 'auto',
-                borderRadius: 1.5,
-                cursor: 'pointer',
-                objectFit: 'cover',
-                aspectRatio: '16/11',
-                '&:hover': { opacity: 0.9 },
-              }}
-            />
+            <Stack spacing={1} sx={{ width: '100%' }}>
+              <Box
+                component="img"
+                alt="attachment"
+                src={imageUrl}
+                onClick={() => onOpenLightbox(imageUrl)}
+                sx={{
+                  width: 1,
+                  maxWidth: { xs: 240, sm: 320, md: 400 },
+                  height: 'auto',
+                  borderRadius: 1,
+                  cursor: 'pointer',
+                  objectFit: 'cover',
+                  aspectRatio: '16/11',
+                  '&:hover': { opacity: 0.9 },
+                }}
+              />
+              {captionText && (
+                <Typography
+                  variant="body2"
+                  sx={{
+                    px: 0.5,
+                    pb: 0.5,
+                    color: me ? 'grey.800' : 'text.primary',
+                  }}
+                >
+                  {renderTextWithLinks(captionText)}
+                </Typography>
+              )}
+            </Stack>
           ) : isAudio ? (
             <Box sx={{ width: 280, pt: 1 }}>
               {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
@@ -536,63 +625,22 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
                   <Iconify icon="solar:download-minimalistic-bold" width={20} sx={{ color: me ? 'inherit' : 'text.secondary' }} />
                 </Stack>
               ))}
+              {captionText && (
+                <Typography
+                  variant="body2"
+                  sx={{
+                    px: 0.5,
+                    pt: 0.5,
+                    color: me ? 'grey.800' : 'text.primary',
+                  }}
+                >
+                  {renderTextWithLinks(captionText)}
+                </Typography>
+              )}
             </Stack>
           ) : (
             <>
               {(() => {
-                const renderTextWithLinks = (text: string) => {
-                  const urlRegex = /(https?:\/\/[^\s]+)/g;
-                  const parts = text.split(urlRegex);
-                  return parts.map((part, i) => {
-                    if (part.match(urlRegex)) {
-                      const inviteMatch = part.match(/\/group\/invite\/([^/]+)/);
-
-                      if (inviteMatch && inviteMatch[1]) {
-                        const code = inviteMatch[1];
-                        return (
-                          <Box
-                            component="span"
-                            key={i}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              e.preventDefault();
-                              setInviteModalCode(code);
-                            }}
-                            sx={{
-                              cursor: 'pointer',
-                              color: me ? 'inherit' : 'primary.main',
-                              textDecoration: 'underline',
-                              wordBreak: 'break-all',
-                              '&:hover': { opacity: 0.8 },
-                            }}
-                          >
-                            {part}
-                          </Box>
-                        );
-                      }
-
-                      return (
-                        <Box
-                          component="a"
-                          key={i}
-                          href={part}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          sx={{
-                            color: me ? 'inherit' : 'primary.main',
-                            textDecoration: 'underline',
-                            wordBreak: 'break-all',
-                            '&:hover': { opacity: 0.8 },
-                          }}
-                        >
-                          {part}
-                        </Box>
-                      );
-                    }
-                    return <span key={i}>{part}</span>;
-                  });
-                };
-
                 if (body.length > 300 && !isExpanded) {
                   return (
                     <>

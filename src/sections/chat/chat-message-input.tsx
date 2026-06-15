@@ -17,6 +17,7 @@ import { useRouter } from 'src/routes/hooks';
 
 import axios from 'src/utils/axios';
 import { uuidv4 } from 'src/utils/uuidv4';
+import { fData } from 'src/utils/format-number';
 import { fSub, today } from 'src/utils/format-time';
 
 import { useSocket } from 'src/socket';
@@ -25,6 +26,7 @@ import { sendMessage, createConversation } from 'src/actions/chat';
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
+import { FileThumbnail } from 'src/components/file-thumbnail';
 
 import { useMockedUser } from 'src/auth/hooks';
 
@@ -104,12 +106,14 @@ export function ChatMessageInput({
   );
 
   const fileRef = useRef<HTMLInputElement>(null);
-
   const docRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const [message, setMessage] = useState('');
-
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [pendingFilePreview, setPendingFilePreview] = useState<string>('');
+  const [pendingFileType, setPendingFileType] = useState<'image' | 'video' | 'document' | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   useEffect(() => {
     if (recipients.length > 0 && !selectedConversationId) {
@@ -129,9 +133,18 @@ export function ChatMessageInput({
     setEmojiAnchor(null);
   }, []);
 
-    const handleSelectEmoji = useCallback((emoji: string) => {
+  const handleSelectEmoji = useCallback((emoji: string) => {
     setMessage((prev) => prev + emoji);
   }, []);
+
+  const handleRemoveAttachment = useCallback(() => {
+    setPendingFile(null);
+    if (pendingFilePreview) {
+      URL.revokeObjectURL(pendingFilePreview);
+      setPendingFilePreview('');
+    }
+    setPendingFileType(null);
+  }, [pendingFilePreview]);
 
   const [gifAnchor, setGifAnchor] = useState<HTMLButtonElement | null>(null);
   const [gifSearch, setGifSearch] = useState('');
@@ -245,65 +258,53 @@ export function ChatMessageInput({
     }
   }, [selectedConversationId, myContact.id, replyingToMessage, setReplyingToMessage]);
 
-  const handleFileChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !selectedConversationId) return;
 
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('conversationId', selectedConversationId);
-      formData.append('messageId', uuidv4());
-      
-      if (replyingToMessage) {
-        const pId = replyingToMessage._id || replyingToMessage.id || replyingToMessage.messageId;
-        formData.append('parentMessageId', pId);
-        formData.append('parentId', pId);
-      }
+    let type: 'image' | 'video' | 'document' = 'document';
+    if (file.type.startsWith('image/')) {
+      type = 'image';
+    } else if (file.type.startsWith('video/')) {
+      type = 'video';
+    }
 
-      await axios.post('/api/v1/files/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      console.log('[IMAGE_UPLOAD] File uploaded via FormData');
-    } catch (error) {
-      console.error('Failed to send file:', error);
+    setPendingFile(file);
+    setPendingFileType(type);
+    if (type === 'image' || type === 'video') {
+      setPendingFilePreview(URL.createObjectURL(file));
+    } else {
+      setPendingFilePreview('');
     }
 
     if (fileRef.current) {
       fileRef.current.value = '';
     }
-    setReplyingToMessage(null);
-  }, [selectedConversationId, replyingToMessage, setReplyingToMessage]);
+  }, [selectedConversationId]);
 
-  const handleDocChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleDocChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !selectedConversationId) return;
 
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('conversationId', selectedConversationId);
-      formData.append('messageId', uuidv4());
-      
-      if (replyingToMessage) {
-        const pId = replyingToMessage._id || replyingToMessage.id || replyingToMessage.messageId;
-        formData.append('parentMessageId', pId);
-        formData.append('parentId', pId);
-      }
+    let type: 'image' | 'video' | 'document' = 'document';
+    if (file.type.startsWith('image/')) {
+      type = 'image';
+    } else if (file.type.startsWith('video/')) {
+      type = 'video';
+    }
 
-      await axios.post('/api/v1/files/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      console.log('[FILE_UPLOAD] File uploaded via FormData');
-    } catch (error) {
-      console.error('Failed to send file:', error);
+    setPendingFile(file);
+    setPendingFileType(type);
+    if (type === 'image' || type === 'video') {
+      setPendingFilePreview(URL.createObjectURL(file));
+    } else {
+      setPendingFilePreview('');
     }
 
     if (docRef.current) {
       docRef.current.value = '';
     }
-    setReplyingToMessage(null);
-  }, [selectedConversationId, replyingToMessage, setReplyingToMessage]);
+  }, [selectedConversationId]);
 
 
 
@@ -378,6 +379,53 @@ export function ChatMessageInput({
 
   const onSubmitMessage = useCallback(async () => {
     try {
+      if (pendingFile) {
+        if (message.length > 4000) {
+          toast.error('Caption is too long (maximum 4000 characters)');
+          return;
+        }
+
+        setIsUploading(true);
+        try {
+          const formData = new FormData();
+          formData.append('file', pendingFile);
+          formData.append('conversationId', selectedConversationId);
+          formData.append('messageId', uuidv4());
+          
+          formData.append('text', message);
+          formData.append('body', message);
+          
+          if (replyingToMessage) {
+            const pId = replyingToMessage._id || replyingToMessage.id || replyingToMessage.messageId;
+            formData.append('parentMessageId', pId);
+            formData.append('parentId', pId);
+          }
+
+          await axios.post('/api/v1/files/upload', formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+          });
+          console.log('[FILE_UPLOAD_INLINE_WITH_CAPTION] File uploaded via FormData');
+          
+          setPendingFile(null);
+          if (pendingFilePreview) {
+            URL.revokeObjectURL(pendingFilePreview);
+            setPendingFilePreview('');
+          }
+          setPendingFileType(null);
+          setMessage('');
+          setReplyingToMessage(null);
+          
+          mutate(`/api/v1/chats/conversations/${selectedConversationId}`);
+          mutate('/api/v1/chats/conversations');
+        } catch (error) {
+          console.error('Failed to send file with caption:', error);
+          toast.error('Failed to upload attachment');
+        } finally {
+          setIsUploading(false);
+        }
+        return;
+      }
+
       if (message.trim()) {
         if (message.length > 4000) {
           toast.error('Message is too long (maximum 4000 characters)');
@@ -398,7 +446,18 @@ export function ChatMessageInput({
     } catch (error) {
       console.error(error);
     }
-  }, [conversationData, message, messageData, onAddRecipients, router, selectedConversationId, setReplyingToMessage]);
+  }, [
+    conversationData,
+    message,
+    messageData,
+    onAddRecipients,
+    router,
+    selectedConversationId,
+    setReplyingToMessage,
+    pendingFile,
+    pendingFilePreview,
+    replyingToMessage,
+  ]);
 
   const handleSendMessage = useCallback(
     async (event: React.KeyboardEvent<HTMLInputElement>) => {
@@ -580,6 +639,102 @@ export function ChatMessageInput({
         </Stack>
       )}
 
+      {/* Attachment Preview (displayed directly above the input box) */}
+      {pendingFile && (
+        <Stack
+          direction="row"
+          alignItems="center"
+          spacing={2}
+          sx={{
+            p: 1.5,
+            mx: 1,
+            mt: 1,
+            borderRadius: 1,
+            borderTop: (theme) => `solid 1px ${theme.vars.palette.divider}`,
+            bgcolor: 'background.neutral',
+            position: 'relative',
+          }}
+        >
+          {/* Preview Thumbnail */}
+          {pendingFileType === 'image' && pendingFilePreview && (
+            <Box
+              component="img"
+              src={pendingFilePreview}
+              alt="Preview"
+              sx={{
+                width: 60,
+                height: 60,
+                borderRadius: 1,
+                objectFit: 'cover',
+                boxShadow: (theme) => theme.customShadows.z4,
+              }}
+            />
+          )}
+
+          {pendingFileType === 'video' && pendingFilePreview && (
+            <Box
+              component="video"
+              src={pendingFilePreview}
+              sx={{
+                width: 60,
+                height: 60,
+                borderRadius: 1,
+                objectFit: 'cover',
+                boxShadow: (theme) => theme.customShadows.z4,
+              }}
+            />
+          )}
+
+          {pendingFileType === 'document' && (
+            <Stack
+              direction="row"
+              spacing={1}
+              alignItems="center"
+              sx={{
+                p: 1,
+                borderRadius: 1,
+                bgcolor: 'background.paper',
+                border: (theme) => `solid 1px ${theme.vars.palette.divider}`,
+                maxWidth: 240,
+              }}
+            >
+              <FileThumbnail
+                file={pendingFile.name}
+                slotProps={{ icon: { width: 20, height: 20 } }}
+                sx={{ width: 32, height: 32 }}
+              />
+              <Stack spacing={0.25} sx={{ minWidth: 0 }}>
+                <Typography variant="caption" noWrap sx={{ fontWeight: 600, fontSize: '12px', color: 'text.primary' }}>
+                  {pendingFile.name}
+                </Typography>
+                <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '10px' }}>
+                  {fData(pendingFile.size)}
+                </Typography>
+              </Stack>
+            </Stack>
+          )}
+
+          <Stack sx={{ minWidth: 0, flexGrow: 1 }}>
+            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 'bold' }}>
+              Attachment
+            </Typography>
+            <Typography variant="body2" noWrap sx={{ color: 'text.primary' }}>
+              {pendingFile.name}
+            </Typography>
+          </Stack>
+
+          {isUploading ? (
+            <Typography variant="caption" sx={{ color: 'text.secondary', mr: 2 }}>
+              Uploading...
+            </Typography>
+          ) : (
+            <IconButton size="small" onClick={handleRemoveAttachment}>
+              <Iconify icon="mingcute:close-line" width={18} />
+            </IconButton>
+          )}
+        </Stack>
+      )}
+
       {isRecording ? (
         <Stack
           direction="row"
@@ -669,11 +824,11 @@ export function ChatMessageInput({
               >
                 <Iconify icon="solar:microphone-bold" />
               </IconButton>
-              <IconButton onClick={handleSendClick} disabled={!message.trim() || !isUserMember}>
+              <IconButton onClick={handleSendClick} disabled={(!message.trim() && !pendingFile) || !isUserMember || isUploading}>
                 <Iconify
                   icon="iconamoon:send-fill"
                   sx={{
-                    color: (message.trim() && isUserMember) ? 'primary.main' : 'text.disabled',
+                    color: ((message.trim() || pendingFile) && isUserMember) ? 'primary.main' : 'text.disabled',
                     transition: 'color 0.2s',
                   }}
                 />

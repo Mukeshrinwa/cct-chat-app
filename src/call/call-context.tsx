@@ -225,7 +225,18 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       stopOutgoingTone();
       if (callTimeoutRef.current) clearTimeout(callTimeoutRef.current);
       await cleanupMedia();
-      setCall((prev) => ({ ...DEFAULT_CALL, status: nextStatus }));
+      setCall((prev) => {
+        const terminalStatuses: CallStatus[] = ['idle', 'ended', 'rejected', 'missed'];
+        if (terminalStatuses.includes(prev.status) && nextStatus !== 'idle') {
+          return prev;
+        }
+        return {
+          ...DEFAULT_CALL,
+          status: nextStatus,
+          caller: nextStatus === 'idle' ? null : prev.caller,
+          callType: nextStatus === 'idle' ? 'audio' : prev.callType,
+        };
+      });
     },
     [cleanupMedia, stopIncomingRingtone, stopOutgoingTone]
   );
@@ -367,7 +378,21 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       }, 60_000);
 
       try {
-        socketService.emit('call_user', payload);
+        const socket = socketService.getSocket();
+        if (socket) {
+          socket.emit('call_user', payload, (ack: any) => {
+            if (ack && ack.status === 'ok' && ack.call) {
+              setCall((prev) => {
+                if (prev.status === 'calling') {
+                  return { ...prev, roomName: ack.call.roomName };
+                }
+                return prev;
+              });
+            }
+          });
+        } else {
+          throw new Error('Socket not connected');
+        }
       } catch (socketErr) {
         // Fallback: REST API
         console.warn('[Call] socket emit failed, using REST fallback:', socketErr);
@@ -430,8 +455,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       }
     }
     await resetCall('ended');
-    // Brief ended state then idle
-    setTimeout(() => setCall({ ...DEFAULT_CALL, status: 'idle' }), 2000);
+    setTimeout(() => resetCall('idle'), 2000);
   }, [call.roomName, resetCall]);
 
   // ----------------------------------------------------------------------
@@ -496,6 +520,13 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       });
 
       playIncomingRingtone();
+
+      // Emit incoming_call_ack so the server registers ringing state
+      try {
+        socketService.emit('incoming_call_ack', { roomName: payload.roomName });
+      } catch (err) {
+        console.warn('[Call] Failed to emit incoming_call_ack:', err);
+      }
     };
 
     // ── call_ringing ───────────────────────────────────────────────────
@@ -536,21 +567,16 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
 
     // ── call_missed ────────────────────────────────────────────────────
     const onCallMissed = async (_payload: { roomName: string }) => {
-      stopOutgoingTone();
-      stopIncomingRingtone();
-      toast.warning('Call missed');
-      setCall((prev) => ({ ...prev, status: 'missed' }));
-      setTimeout(() => setCall({ ...DEFAULT_CALL, status: 'idle' }), 3000);
+      await resetCall('missed');
+      setTimeout(() => resetCall('idle'), 3000);
       // Refresh call history
       getCallHistory().catch(() => {});
     };
 
     // ── call_rejected ──────────────────────────────────────────────────
     const onCallRejected = async (_payload: { roomName: string }) => {
-      stopOutgoingTone();
-      toast.info('Call was declined');
-      setCall((prev) => ({ ...prev, status: 'rejected' }));
-      setTimeout(() => setCall({ ...DEFAULT_CALL, status: 'idle' }), 2000);
+      await resetCall('rejected');
+      setTimeout(() => resetCall('idle'), 2000);
     };
 
     // ── group_call_started ─────────────────────────────────────────────
@@ -580,7 +606,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     const onGroupCallEnded = async (_payload: { roomId: string }) => {
       toast.info('Group call ended');
       await resetCall('ended');
-      setTimeout(() => setCall({ ...DEFAULT_CALL, status: 'idle' }), 2000);
+      setTimeout(() => resetCall('idle'), 2000);
     };
 
     // ── participant_joined ─────────────────────────────────────────────
@@ -604,7 +630,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     // ── end_call (server-pushed) ───────────────────────────────────────
     const onEndCall = async (_payload: { roomName: string }) => {
       await resetCall('ended');
-      setTimeout(() => setCall({ ...DEFAULT_CALL, status: 'idle' }), 2000);
+      setTimeout(() => resetCall('idle'), 2000);
     };
 
     socket.on('incoming_call', onIncomingCall);
@@ -618,6 +644,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
     socket.on('participant_joined', onParticipantJoined);
     socket.on('participant_left', onParticipantLeft);
     socket.on('end_call', onEndCall);
+    socket.on('call_ended', onEndCall);
 
     return () => {
       socket.off('incoming_call', onIncomingCall);
@@ -631,6 +658,7 @@ export function CallProvider({ children }: { children: React.ReactNode }) {
       socket.off('participant_joined', onParticipantJoined);
       socket.off('participant_left', onParticipantLeft);
       socket.off('end_call', onEndCall);
+      socket.off('call_ended', onEndCall);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUserId]);

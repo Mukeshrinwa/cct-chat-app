@@ -196,7 +196,7 @@ export function useGetConversations() {
         messages,
         participants: participantsList,
         isPinned: conv.pinnedAt ? true : (conv.isPinned !== undefined ? conv.isPinned : !!conv.pinned),
-        isMuted: (conv.muteUntil && new Date(conv.muteUntil).getTime() > Date.now()) ? true : (conv.isMuted !== undefined ? conv.isMuted : !!conv.muted),
+        isMuted: (conv.muteUntil && new Date(conv.muteUntil).getTime() > Date.now()) || (conv.notificationMode && conv.notificationMode !== 'ALL') ? true : (conv.isMuted !== undefined ? conv.isMuted : !!conv.muted),
         isArchived: conv.isArchived !== undefined ? conv.isArchived : (conv.archivedAt ? true : !!conv.archived),
       };
     });
@@ -460,7 +460,7 @@ async function fetchConversationDetail(conversationId: string, currentUser: any)
       messages: mappedMessages,
       participants,
       isPinned: conversationData?.pinnedAt ? true : (conversationData?.isPinned !== undefined ? conversationData.isPinned : !!conversationData?.pinned),
-      isMuted: (conversationData?.muteUntil && new Date(conversationData.muteUntil).getTime() > Date.now()) ? true : (conversationData?.isMuted !== undefined ? conversationData.isMuted : !!conversationData?.muted),
+      isMuted: (conversationData?.muteUntil && new Date(conversationData.muteUntil).getTime() > Date.now()) || (conversationData?.notificationMode && conversationData.notificationMode !== 'ALL') ? true : (conversationData?.isMuted !== undefined ? conversationData.isMuted : !!conversationData?.muted),
       isArchived: conversationData?.isArchived !== undefined ? conversationData.isArchived : (conversationData?.archivedAt ? true : !!conversationData?.archived),
     },
   };
@@ -990,8 +990,22 @@ export function useGetMessageById(conversationId: string, messageId: string | un
 // ----------------------------------------------------------------------
 
 export async function muteConversation(conversationId: string, isMuted: boolean) {
+  const body = {
+    isMuted,
+    notificationMode: isMuted ? 'MUTED' : 'ALL',
+    muteUntil: isMuted ? new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toISOString() : null
+  };
   try {
-    const res = await axios.post(`/api/v1/chats/conversation/${conversationId}/mute`, { isMuted });
+    let res;
+    try {
+      res = await axios.post(`/api/v1/chats/conversation/${conversationId}/mute`, body);
+    } catch (err: any) {
+      if (err?.response?.status === 404) {
+        res = await axios.post(`/api/v1/chats/conversations/${conversationId}/mute`, body);
+      } else {
+        throw err;
+      }
+    }
     mutate(`/api/v1/chats/conversations/${conversationId}`);
     mutate('/api/v1/chats/conversations');
     return res.data;

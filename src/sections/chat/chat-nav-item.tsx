@@ -37,6 +37,7 @@ import { Iconify } from 'src/components/iconify';
 import { useMockedUser } from 'src/auth/hooks';
 
 import { useNavItem } from './hooks/use-nav-item';
+import { ChatAvatarPreviewDialog } from './chat-avatar-preview-dialog';
 
 // ----------------------------------------------------------------------
 
@@ -61,6 +62,14 @@ export function ChatNavItem({
 }: Props) {
   const [hovered, setHovered] = useState(false);
   const { user } = useMockedUser();
+
+  const [avatarPreviewOpen, setAvatarPreviewOpen] = useState(false);
+
+  const handleAvatarClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setAvatarPreviewOpen(true);
+  }, []);
 
   const [menuAnchorPosition, setMenuAnchorPosition] = useState<{ x: number; y: number } | null>(null);
 
@@ -196,6 +205,8 @@ export function ChatNavItem({
     <Badge
       variant={hasOnlineInGroup ? 'online' : 'invisible'}
       anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      onClick={handleAvatarClick}
+      sx={{ cursor: 'pointer', '&:hover': { opacity: 0.85 } }}
     >
       {currentGroup?.groupAvatar ? (
         <Avatar alt={currentGroup.groupName || 'Group'} src={currentGroup.groupAvatar} sx={{ width: 48, height: 48 }} />
@@ -210,7 +221,13 @@ export function ChatNavItem({
   );
 
   const renderSingle = (
-    <Badge key={status} variant={status} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
+    <Badge 
+      key={status} 
+      variant={status} 
+      anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      onClick={handleAvatarClick}
+      sx={{ cursor: 'pointer', '&:hover': { opacity: 0.85 } }}
+    >
       <Avatar alt={name} src={avatarUrl} sx={{ width: 48, height: 48 }} />
     </Badge>
   );
@@ -249,8 +266,25 @@ export function ChatNavItem({
         {!collapse && (
           <>
             <ListItemText
-              primary={currentGroup?.groupName || displayName}
-              primaryTypographyProps={{ noWrap: true, component: 'span', variant: 'subtitle2' }}
+              primary={
+                <Stack direction="row" alignItems="center" spacing={0.5} sx={{ maxWidth: 1 }}>
+                  <Box component="span" sx={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                    {currentGroup?.groupName || displayName}
+                  </Box>
+                  {conversation.isMuted && (
+                    <Iconify
+                      icon="solar:bell-off-bold"
+                      sx={{
+                        width: 14,
+                        height: 14,
+                        color: 'text.disabled',
+                        flexShrink: 0,
+                      }}
+                    />
+                  )}
+                </Stack>
+              }
+              primaryTypographyProps={{ component: 'div', variant: 'subtitle2' }}
               secondary={displayText}
               secondaryTypographyProps={{
                 noWrap: true,
@@ -425,6 +459,13 @@ export function ChatNavItem({
           <ListItemText primary={isArchived ? 'Unarchive' : 'Archive'} />
         </MenuItem>
       </Menu>
+
+      <ChatAvatarPreviewDialog
+        open={avatarPreviewOpen}
+        onClose={() => setAvatarPreviewOpen(false)}
+        name={currentGroup?.groupName || displayName}
+        avatarUrl={currentGroup?.groupAvatar || avatarUrl}
+      />
     </Box>
   );
 }

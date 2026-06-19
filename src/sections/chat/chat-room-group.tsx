@@ -48,6 +48,7 @@ import { useMockedUser } from 'src/auth/hooks';
 
 import { CollapseButton } from './styles';
 import { ChatGroupEditDialog } from './chat-group-edit-dialog';
+import { ChatAvatarPreviewDialog } from './chat-avatar-preview-dialog';
 import { ChatRoomParticipantDialog } from './chat-room-participant-dialog';
 
 // ----------------------------------------------------------------------
@@ -127,6 +128,13 @@ export function ChatRoomGroup({ participants, isUserMember = true }: Props) {
   const [isAddingMembers, setIsAddingMembers] = useState(false);
   const [isLeavingGroup, setIsLeavingGroup] = useState(false);
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
+
+  const [avatarPreviewOpen, setAvatarPreviewOpen] = useState(false);
+
+  const handleAvatarClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setAvatarPreviewOpen(true);
+  }, []);
 
   // Custom Confirmation Modals State
   const confirmRemove = useBoolean();
@@ -393,7 +401,8 @@ export function ChatRoomGroup({ participants, isUserMember = true }: Props) {
       <Avatar
         alt={currentGroup?.groupName || 'Group'}
         src={currentGroup?.groupAvatar || ''}
-        sx={{ width: 72, height: 72, mb: 1.5 }}
+        onClick={handleAvatarClick}
+        sx={{ width: 72, height: 72, mb: 1.5, cursor: 'pointer', '&:hover': { opacity: 0.85 } }}
       />
 
       {/* Group name — bounded, no overflow */}
@@ -806,6 +815,13 @@ export function ChatRoomGroup({ participants, isUserMember = true }: Props) {
             Leave
           </Button>
         }
+      />
+
+      <ChatAvatarPreviewDialog
+        open={avatarPreviewOpen}
+        onClose={() => setAvatarPreviewOpen(false)}
+        name={currentGroup?.groupName || 'Group Chat'}
+        avatarUrl={currentGroup?.groupAvatar || ''}
       />
     </>
   );

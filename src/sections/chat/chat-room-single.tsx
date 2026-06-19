@@ -44,6 +44,7 @@ import { Iconify } from 'src/components/iconify';
 import { useMockedUser } from 'src/auth/hooks';
 
 import { ChatGroupCreateDialog } from './chat-group-create-dialog';
+import { ChatAvatarPreviewDialog } from './chat-avatar-preview-dialog';
 
 // ----------------------------------------------------------------------
 
@@ -87,6 +88,13 @@ export function ChatRoomSingle({ participant }: Props) {
   const [newGroupOpen, setNewGroupOpen] = useState(false);
   const [addGroupOpen, setAddGroupOpen] = useState(false);
   const [addingToGroupId, setAddingToGroupId] = useState<string | null>(null);
+
+  const [avatarPreviewOpen, setAvatarPreviewOpen] = useState(false);
+
+  const handleAvatarClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setAvatarPreviewOpen(true);
+  }, []);
 
   // ── Derived state ─────────────────────────────────────────────────────
   const isMe = user?.id === participant?.id;
@@ -288,9 +296,12 @@ export function ChatRoomSingle({ participant }: Props) {
           <Avatar
             src={participant.avatarUrl}
             alt={participant.name}
+            onClick={handleAvatarClick}
             sx={{
               width: 80,
               height: 80,
+              cursor: 'pointer',
+              '&:hover': { opacity: 0.85 },
               border: (theme) => `3px solid ${theme.vars.palette.background.paper}`,
               boxShadow: (theme) => `0 0 0 3px ${theme.vars.palette.primary.main}22`,
             }}
@@ -558,6 +569,13 @@ export function ChatRoomSingle({ participant }: Props) {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <ChatAvatarPreviewDialog
+        open={avatarPreviewOpen}
+        onClose={() => setAvatarPreviewOpen(false)}
+        name={participant.name}
+        avatarUrl={participant.avatarUrl}
+      />
     </Box>
   );
 }

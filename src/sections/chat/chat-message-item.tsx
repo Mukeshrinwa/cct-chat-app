@@ -1,7 +1,7 @@
 import type { IChatMessage, IChatParticipant } from 'src/types/chat';
 
 import { mutate } from 'swr';
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
@@ -38,6 +38,7 @@ import { useMockedUser } from 'src/auth/hooks';
 import { useMessage } from './hooks/use-message';
 import { ChatForwardDialog } from './chat-forward-dialog';
 import { ChatGroupInviteDialog } from './chat-group-invite-dialog';
+import { ChatAvatarPreviewDialog } from './chat-avatar-preview-dialog';
 
 // ----------------------------------------------------------------------
 
@@ -120,6 +121,13 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
   const { body, createdAt } = message;
 
   const imageUrl = message.attachments?.[0]?.preview || getMediaUrl(body);
+
+  const [avatarPreviewOpen, setAvatarPreviewOpen] = useState(false);
+
+  const handleAvatarClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setAvatarPreviewOpen(true);
+  }, []);
 
   const getCaptionText = () => {
     if (!body || typeof body !== 'string') return '';
@@ -1057,7 +1065,14 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
 
   return (
     <Stack id={`msg-${message.id}`} direction="row" justifyContent={me ? 'flex-end' : 'unset'} sx={{ mb: 3 }}>
-      {!me && <Avatar alt={firstName} src={avatarUrl} sx={{ width: 32, height: 32, mr: 2 }} />}
+      {!me && (
+        <Avatar
+          alt={firstName}
+          src={avatarUrl}
+          onClick={handleAvatarClick}
+          sx={{ width: 32, height: 32, mr: 2, cursor: 'pointer', '&:hover': { opacity: 0.85 } }}
+        />
+      )}
 
       <Stack alignItems={me ? 'flex-end' : 'flex-start'}>
         {renderInfo}
@@ -1100,6 +1115,13 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
           inviteCode={inviteModalCode}
         />
       )}
+
+      <ChatAvatarPreviewDialog
+        open={avatarPreviewOpen}
+        onClose={() => setAvatarPreviewOpen(false)}
+        name={participants.find((p) => p.id === message.senderId)?.name || firstName || 'User'}
+        avatarUrl={avatarUrl}
+      />
     </Stack>
   );
 }

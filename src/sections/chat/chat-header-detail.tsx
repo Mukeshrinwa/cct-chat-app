@@ -29,12 +29,12 @@ import { useGetGroups } from 'src/actions/group';
 import { useAuthStore } from 'src/store/useAuthStore';
 import { blockUser, unblockUser } from 'src/api/user';
 import { useGroupStore } from 'src/store/useGroupStore';
-import { 
-  clearChat, 
-  pinConversation, 
-  muteConversation, 
+import {
+  clearChat,
+  pinConversation,
+  muteConversation,
   deleteConversation,
-  useGetConversation, 
+  useGetConversation,
   archiveConversation,
   setConversationDisappearingMode,
 } from 'src/actions/chat';
@@ -44,6 +44,7 @@ import { Iconify } from 'src/components/iconify';
 import { usePopover, CustomPopover } from 'src/components/custom-popover';
 
 import { ChatHeaderSkeleton } from './chat-skeleton';
+import { ChatAvatarPreviewDialog } from './chat-avatar-preview-dialog';
 
 import type { UseNavCollapseReturn } from './hooks/use-collapse-nav';
 
@@ -97,6 +98,13 @@ export function ChatHeaderDetail({
   const { user: currentUser, toggleBlockUser } = useAuthStore();
   const [blockLoading, setBlockLoading] = useState(false);
 
+  const [avatarPreviewOpen, setAvatarPreviewOpen] = useState(false);
+
+  const handleAvatarClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setAvatarPreviewOpen(true);
+  }, []);
+
   const lgUp = useResponsive('up', 'lg');
 
   const { collapseDesktop, onCollapseDesktop, onOpenMobile } = collapseNav;
@@ -131,7 +139,7 @@ export function ChatHeaderDetail({
 
   const isBlockedByOther = useMemo(() => {
     if (!conversationId || !rawConversationEntry || rawConversationEntry.type !== 'direct') return false;
-    const {otherUser} = rawConversationEntry;
+    const { otherUser } = rawConversationEntry;
     if (!otherUser || !currentUser) return false;
     const currentUserIdStr = (currentUser.id || currentUser._id || '').toString();
     return (otherUser.blockedUsers || []).some((id: any) => id.toString() === currentUserIdStr);
@@ -140,7 +148,7 @@ export function ChatHeaderDetail({
   const isRecording = (recordingUsers[conversationId] || []).includes(singleParticipant?.id);
   const isTyping = (typingUsers[conversationId] || []).includes(singleParticipant?.id);
   const isRealtimeOnline = onlineUsers.has(singleParticipant?.id);
-  
+
   const statusToDisplay = isRealtimeOnline ? 'online' : singleParticipant?.status;
 
 
@@ -205,24 +213,24 @@ export function ChatHeaderDetail({
   const handleArchive = useCallback(async () => {
     try {
       await archiveConversation(conversationId, !isArchived);
-      
+
       // Update local storage for client-side filtering compatibility
       try {
         const archivedStr = localStorage.getItem('cct_archived_conversations');
         let archived = archivedStr ? JSON.parse(archivedStr) : [];
         if (!Array.isArray(archived)) archived = [];
-        
+
         const isCurrentlyArchived = archived.includes(conversationId);
         const updated = isCurrentlyArchived
           ? archived.filter((id: string) => id !== conversationId)
           : [...archived, conversationId];
-          
+
         localStorage.setItem('cct_archived_conversations', JSON.stringify(updated));
         window.dispatchEvent(new Event('cct_archive_changed'));
       } catch (e) {
         console.error(e);
       }
-      
+
       toast.success(isArchived ? 'Chat unarchived' : 'Chat archived');
       popover.onClose();
     } catch (err) {
@@ -276,7 +284,7 @@ export function ChatHeaderDetail({
       disappearingPopover.onClose();
       popover.onClose();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId]);
 
   const typingUserIds = typingUsers[conversationId] || [];
@@ -304,10 +312,15 @@ export function ChatHeaderDetail({
         <Avatar
           src={currentGroup.groupAvatar}
           alt={currentGroup.groupName || 'Group'}
-          sx={{ width: 40, height: 40 }}
+          onClick={handleAvatarClick}
+          sx={{ width: 40, height: 40, cursor: 'pointer', '&:hover': { opacity: 0.85 } }}
         />
       ) : (
-        <AvatarGroup max={3} sx={{ [`& .${avatarGroupClasses.avatar}`]: { width: 32, height: 32 } }}>
+        <AvatarGroup 
+          max={3} 
+          onClick={handleAvatarClick}
+          sx={{ cursor: 'pointer', [`& .${avatarGroupClasses.avatar}`]: { width: 32, height: 32 } }}
+        >
           {participants.map((participant) => (
             <Avatar key={participant.id} alt={participant.name} src={participant.avatarUrl} />
           ))}
@@ -346,6 +359,8 @@ export function ChatHeaderDetail({
       <Badge
         variant={statusToDisplay}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        onClick={handleAvatarClick}
+        sx={{ cursor: 'pointer' }}
       >
         <Avatar src={singleParticipant?.avatarUrl} alt={singleParticipant?.name} />
       </Badge>
@@ -462,21 +477,21 @@ export function ChatHeaderDetail({
               {(disappearingMode !== 'off' && disappearingMode !== rawDisappearingMode
                 ? disappearingMode
                 : rawDisappearingMode) !== 'off' && (
-                <Stack
-                  component="span"
-                  sx={{
-                    fontSize: 10,
-                    fontWeight: 700,
-                    px: 0.75,
-                    py: 0.25,
-                    borderRadius: 0.75,
-                    bgcolor: 'primary.soft',
-                    color: 'primary.main',
-                  }}
-                >
-                  {disappearingMode !== 'off' ? disappearingMode : rawDisappearingMode}
-                </Stack>
-              )}
+                  <Stack
+                    component="span"
+                    sx={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      px: 0.75,
+                      py: 0.25,
+                      borderRadius: 0.75,
+                      bgcolor: 'primary.soft',
+                      color: 'primary.main',
+                    }}
+                  >
+                    {disappearingMode !== 'off' ? disappearingMode : rawDisappearingMode}
+                  </Stack>
+                )}
               <Iconify icon="eva:chevron-right-fill" width={16} sx={{ color: 'text.disabled' }} />
             </Stack>
           </MenuItem>
@@ -537,6 +552,13 @@ export function ChatHeaderDetail({
           })}
         </MenuList>
       </CustomPopover>
+
+      <ChatAvatarPreviewDialog
+        open={avatarPreviewOpen}
+        onClose={() => setAvatarPreviewOpen(false)}
+        name={currentGroup?.groupName || singleParticipant?.name || 'Chat'}
+        avatarUrl={currentGroup?.groupAvatar || singleParticipant?.avatarUrl}
+      />
     </>
   );
 }

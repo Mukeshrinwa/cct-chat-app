@@ -48,6 +48,7 @@ import { useMockedUser } from 'src/auth/hooks';
 
 import { InviteList } from './invite/InviteList';
 import { InviteModal } from './invite/InviteModal';
+import { ImageCropperDialog } from './image-cropper-dialog';
 import { ChatShareInviteDialog } from './chat-share-invite-dialog';
 
 // ----------------------------------------------------------------------
@@ -108,6 +109,10 @@ export function ChatGroupEditDialog({ open, onClose, group }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [groupAvatarPreview, setGroupAvatarPreview] = useState('');
   const [avatarUploading, setAvatarUploading] = useState(false);
+
+  // Cropper states
+  const [cropperOpen, setCropperOpen] = useState(false);
+  const [cropperSrc, setCropperSrc] = useState('');
 
   // Derived
   const rawOwnerId = group?.owner?.id || group?.owner?._id || group?.owner || '';
@@ -270,28 +275,15 @@ export function ChatGroupEditDialog({ open, onClose, group }: Props) {
     }
   };
 
-  const handleAvatarFileChange = useCallback(
-    async (event: React.ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      if (!file) return;
-
-      if (!file.type.startsWith('image/')) {
-        toast.error('Please select a valid image file (JPG, PNG, WebP)');
-        return;
-      }
-      if (file.size > 5 * 1024 * 1024) {
-        toast.error('Image must be less than 5MB');
-        return;
-      }
-
-      // Show local preview immediately
-      const previewUrl = URL.createObjectURL(file);
+  const handleCroppedAvatarUpload = useCallback(
+    async (croppedFile: File) => {
+      const previewUrl = URL.createObjectURL(croppedFile);
       setGroupAvatarPreview(previewUrl);
 
       try {
         setAvatarUploading(true);
         const formData = new FormData();
-        formData.append('avatar', file);
+        formData.append('avatar', croppedFile);
         const res = await axios.post(`/api/v1/groups/${group._id}/avatar`, formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
@@ -304,15 +296,36 @@ export function ChatGroupEditDialog({ open, onClose, group }: Props) {
         setGroupAvatarPreview(newUrl);
         toast.success('Group photo updated!');
       } catch {
-        // Revert preview on failure
         setGroupAvatarPreview(groupAvatar);
         toast.error('Failed to upload group photo');
       } finally {
         setAvatarUploading(false);
-        if (fileInputRef.current) fileInputRef.current.value = '';
       }
     },
     [group._id, groupAvatar]
+  );
+
+  const handleAvatarFileChange = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+
+      if (!file.type.startsWith('image/')) {
+        toast.error('Please select a valid image file (JPG, PNG, WebP)');
+        return;
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error('Image must be less than 10MB');
+        return;
+      }
+
+      const previewUrl = URL.createObjectURL(file);
+      setCropperSrc(previewUrl);
+      setCropperOpen(true);
+
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    },
+    []
   );
 
   // ── Tab panels ──────────────────────────────────────────────────────
@@ -803,6 +816,16 @@ export function ChatGroupEditDialog({ open, onClose, group }: Props) {
           </LoadingButton>
         }
       />
+
+      {cropperOpen && (
+        <ImageCropperDialog
+          open={cropperOpen}
+          onClose={() => setCropperOpen(false)}
+          imageSrc={cropperSrc}
+          onCrop={handleCroppedAvatarUpload}
+          title="Crop Group Photo"
+        />
+      )}
     </Dialog>
   );
 }

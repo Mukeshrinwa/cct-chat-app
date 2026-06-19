@@ -1,14 +1,17 @@
 import type { IChatConversation } from 'src/types/chat';
 
-import { useState, useCallback } from 'react';
+import { useRef, useState, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
+import Menu from '@mui/material/Menu';
 import Badge from '@mui/material/Badge';
 import Stack from '@mui/material/Stack';
 import Avatar from '@mui/material/Avatar';
+import MenuItem from '@mui/material/MenuItem';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 import AvatarGroup from '@mui/material/AvatarGroup';
+import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import ListItemButton from '@mui/material/ListItemButton';
 
@@ -20,9 +23,15 @@ import { useResponsive } from 'src/hooks/use-responsive';
 import { fToNow } from 'src/utils/format-time';
 
 import { useGetGroups } from 'src/actions/group';
-import { clickConversation } from 'src/actions/chat';
 import { useGroupStore } from 'src/store/useGroupStore';
+import { 
+  pinConversation, 
+  muteConversation, 
+  clickConversation, 
+  archiveConversation 
+} from 'src/actions/chat';
 
+import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
 
 import { useMockedUser } from 'src/auth/hooks';
@@ -52,6 +61,84 @@ export function ChatNavItem({
 }: Props) {
   const [hovered, setHovered] = useState(false);
   const { user } = useMockedUser();
+
+  const [menuAnchorPosition, setMenuAnchorPosition] = useState<{ x: number; y: number } | null>(null);
+
+  const longPressTimerRef = useRef<any>(null);
+  const isLongPressRef = useRef(false);
+
+  const startLongPress = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    isLongPressRef.current = false;
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+
+    longPressTimerRef.current = setTimeout(() => {
+      isLongPressRef.current = true;
+      setMenuAnchorPosition({ x: clientX, y: clientY });
+    }, 600);
+  }, []);
+
+  const cancelLongPress = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }, []);
+
+  const handleContextMenu = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setMenuAnchorPosition({ x: e.clientX, y: e.clientY });
+  }, []);
+
+  const handleMenuClose = () => {
+    setMenuAnchorPosition(null);
+  };
+
+  const handleTogglePin = useCallback(async () => {
+    try {
+      const newPinned = !conversation.isPinned;
+      await pinConversation(conversation.id, newPinned);
+      toast.success(newPinned ? 'Chat pinned' : 'Chat unpinned');
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to pin/unpin chat');
+    }
+  }, [conversation.id, conversation.isPinned]);
+
+  const handleToggleMute = useCallback(async () => {
+    try {
+      const newMuted = !conversation.isMuted;
+      await muteConversation(conversation.id, newMuted);
+      toast.success(newMuted ? 'Chat muted' : 'Chat unmuted');
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to mute/unmute chat');
+    }
+  }, [conversation.id, conversation.isMuted]);
+
+  const handleToggleArchive = useCallback(async () => {
+    try {
+      if (isArchived) {
+        if (onUnarchive) {
+          onUnarchive(conversation.id);
+        } else {
+          await archiveConversation(conversation.id, false);
+        }
+        toast.success('Chat unarchived');
+      } else {
+        if (onArchive) {
+          onArchive(conversation.id);
+        } else {
+          await archiveConversation(conversation.id, true);
+        }
+        toast.success('Chat archived');
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to archive/unarchive chat');
+    }
+  }, [conversation.id, isArchived, onArchive, onUnarchive]);
 
   const mdUp = useResponsive('up', 'md');
 
@@ -95,6 +182,16 @@ export function ChatNavItem({
     }
   }, [conversation.id, mdUp, onCloseMobile, router]);
 
+  const handleClick = useCallback((e: React.MouseEvent) => {
+    if (isLongPressRef.current) {
+      e.preventDefault();
+      e.stopPropagation();
+      isLongPressRef.current = false;
+      return;
+    }
+    handleClickConversation();
+  }, [handleClickConversation]);
+
   const renderGroup = (
     <Badge
       variant={hasOnlineInGroup ? 'online' : 'invisible'}
@@ -121,9 +218,18 @@ export function ChatNavItem({
   return (
     <Box component="li" sx={{ display: 'flex' }}>
       <ListItemButton
-        onClick={handleClickConversation}
+        onClick={handleClick}
+        onContextMenu={handleContextMenu}
+        onTouchStart={startLongPress}
+        onTouchEnd={cancelLongPress}
+        onTouchMove={cancelLongPress}
+        onMouseDown={startLongPress}
+        onMouseUp={cancelLongPress}
         onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
+        onMouseLeave={() => {
+          setHovered(false);
+          cancelLongPress();
+        }}
         sx={{
           py: 1.5,
           px: 2.5,
@@ -200,6 +306,17 @@ export function ChatNavItem({
                       />
                     )}
 
+                    {conversation.isMuted && (
+                      <Iconify
+                        icon="solar:bell-off-bold"
+                        sx={{
+                          width: 16,
+                          height: 16,
+                          color: 'text.disabled',
+                        }}
+                      />
+                    )}
+
                     {!!conversation.unreadCount && (
                       <Box
                         sx={{
@@ -233,6 +350,81 @@ export function ChatNavItem({
           </>
         )}
       </ListItemButton>
+
+      <Menu
+        open={!!menuAnchorPosition}
+        onClose={handleMenuClose}
+        anchorReference="anchorPosition"
+        anchorPosition={
+          menuAnchorPosition
+            ? { top: menuAnchorPosition.y, left: menuAnchorPosition.x }
+            : undefined
+        }
+        PaperProps={{
+          sx: {
+            width: 180,
+            boxShadow: (theme) => theme.customShadows?.z16 || 6,
+          },
+        }}
+      >
+        <MenuItem
+          onClick={() => {
+            handleTogglePin();
+            handleMenuClose();
+          }}
+        >
+          <ListItemIcon>
+            <Iconify
+              icon="solar:pin-bold"
+              sx={{
+                width: 20,
+                height: 20,
+                color: conversation.isPinned ? 'primary.main' : 'inherit',
+                transform: conversation.isPinned ? 'rotate(0deg)' : 'rotate(45deg)',
+              }}
+            />
+          </ListItemIcon>
+          <ListItemText primary={conversation.isPinned ? 'Unpin' : 'Pin'} />
+        </MenuItem>
+
+        <MenuItem
+          onClick={() => {
+            handleToggleMute();
+            handleMenuClose();
+          }}
+        >
+          <ListItemIcon>
+            <Iconify
+              icon={conversation.isMuted ? 'solar:bell-bold' : 'solar:bell-off-bold'}
+              sx={{
+                width: 20,
+                height: 20,
+                color: conversation.isMuted ? 'warning.main' : 'inherit',
+              }}
+            />
+          </ListItemIcon>
+          <ListItemText primary={conversation.isMuted ? 'Unmute' : 'Mute'} />
+        </MenuItem>
+
+        <MenuItem
+          onClick={() => {
+            handleToggleArchive();
+            handleMenuClose();
+          }}
+        >
+          <ListItemIcon>
+            <Iconify
+              icon={isArchived ? 'solar:archive-up-minimlistic-bold' : 'solar:archive-down-minimlistic-bold'}
+              sx={{
+                width: 20,
+                height: 20,
+                color: isArchived ? 'info.main' : 'inherit',
+              }}
+            />
+          </ListItemIcon>
+          <ListItemText primary={isArchived ? 'Unarchive' : 'Archive'} />
+        </MenuItem>
+      </Menu>
     </Box>
   );
 }

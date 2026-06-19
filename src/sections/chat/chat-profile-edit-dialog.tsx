@@ -34,6 +34,8 @@ import { Iconify } from 'src/components/iconify';
 
 import { useAuthContext } from 'src/auth/hooks';
 
+import { ImageCropperDialog } from './image-cropper-dialog';
+
 // ----------------------------------------------------------------------
 
 type Props = {
@@ -57,6 +59,10 @@ export function ChatProfileEditDialog({ open, onClose }: Props) {
   const [about, setAbout] = useState('');
   const [avatar, setAvatar] = useState('');
   const [avatarPreview, setAvatarPreview] = useState('');
+
+  // Cropper states
+  const [cropperOpen, setCropperOpen] = useState(false);
+  const [cropperSrc, setCropperSrc] = useState('');
 
   // Username check
   const [usernameStatus, setUsernameStatus] = useState<
@@ -111,43 +117,24 @@ export function ChatProfileEditDialog({ open, onClose }: Props) {
     [originalUsername]
   );
 
-  // Handle file selection for avatar upload
-  const handleAvatarFileChange = useCallback(
-    async (event: React.ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      if (!file) return;
-
-      // Validate file type
-      if (!file.type.startsWith('image/')) {
-        setErrorMsg('Please select a valid image file (jpg, png, webp, etc.)');
-        return;
-      }
-
-      // Validate file size (max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        setErrorMsg('Image size must be less than 5MB');
-        return;
-      }
-
+  // Upload cropped avatar to server
+  const handleCroppedAvatarUpload = useCallback(
+    async (croppedFile: File) => {
       // Show local preview immediately
-      const previewUrl = URL.createObjectURL(file);
+      const previewUrl = URL.createObjectURL(croppedFile);
       setAvatarPreview(previewUrl);
 
-      // Upload to server
       try {
         setUploading(true);
         setErrorMsg('');
-        const res = await uploadAvatar(file);
-        // Update avatar URL with the server response
+        const res = await uploadAvatar(croppedFile);
         const newAvatarUrl = res?.data?.avatar || res?.avatar || avatar;
         setAvatar(newAvatarUrl);
         setAvatarPreview(newAvatarUrl);
         toast.success('Photo uploaded successfully!');
 
-        // Update local session data so header avatar updates instantly
         await checkUserSession?.();
 
-        // Emit socket event to notify other clients
         try {
           if (socketService.isConnected()) {
             socketService.emit('user_updated', {
@@ -168,19 +155,42 @@ export function ChatProfileEditDialog({ open, onClose }: Props) {
         }
       } catch (error) {
         console.error(error);
-        // Revert preview on error
         setAvatarPreview(avatar);
         const msg = error?.message || error?.msg || 'Failed to upload photo';
         setErrorMsg(typeof msg === 'string' ? msg : 'Failed to upload photo');
       } finally {
         setUploading(false);
-        // Reset the input so same file can be selected again
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-        }
       }
     },
     [avatar, authUser, name, about, profilePhoto, lastSeen, aboutPrivacy, readReceipts, checkUserSession]
+  );
+
+  // Handle file selection for avatar upload - opens crop editor
+  const handleAvatarFileChange = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+
+      if (!file.type.startsWith('image/')) {
+        setErrorMsg('Please select a valid image file (jpg, png, webp, etc.)');
+        return;
+      }
+
+      // Max size allowed for crop source is 10MB
+      if (file.size > 10 * 1024 * 1024) {
+        setErrorMsg('Image size must be less than 10MB');
+        return;
+      }
+
+      const previewUrl = URL.createObjectURL(file);
+      setCropperSrc(previewUrl);
+      setCropperOpen(true);
+
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    },
+    []
   );
 
   const handleSave = async () => {
@@ -597,6 +607,16 @@ export function ChatProfileEditDialog({ open, onClose }: Props) {
           Save Changes
         </LoadingButton>
       </DialogActions>
+
+      {cropperOpen && (
+        <ImageCropperDialog
+          open={cropperOpen}
+          onClose={() => setCropperOpen(false)}
+          imageSrc={cropperSrc}
+          onCrop={handleCroppedAvatarUpload}
+          title="Crop Profile Photo"
+        />
+      )}
     </Dialog>
   );
 }

@@ -289,7 +289,17 @@ export function ChatHeaderDetail({
     : null;
 
   const renderGroup = (
-    <Stack direction="row" alignItems="center" spacing={2}>
+    <Stack
+      direction="row"
+      alignItems="center"
+      spacing={2}
+      onClick={handleToggleNav}
+      sx={{
+        cursor: 'pointer',
+        userSelect: 'none',
+        '&:hover': { opacity: 0.85 },
+      }}
+    >
       {currentGroup?.groupAvatar ? (
         <Avatar
           src={currentGroup.groupAvatar}
@@ -322,7 +332,17 @@ export function ChatHeaderDetail({
   );
 
   const renderSingle = (
-    <Stack direction="row" alignItems="center" spacing={2}>
+    <Stack
+      direction="row"
+      alignItems="center"
+      spacing={2}
+      onClick={handleToggleNav}
+      sx={{
+        cursor: 'pointer',
+        userSelect: 'none',
+        '&:hover': { opacity: 0.85 },
+      }}
+    >
       <Badge
         variant={statusToDisplay}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
@@ -398,8 +418,10 @@ export function ChatHeaderDetail({
         <IconButton onClick={handleVideoCall} disabled={!isUserMember || isBlockedByOther} title="Start video call">
           <Iconify icon="solar:videocamera-record-bold" />
         </IconButton>
-
-        <IconButton onClick={handleToggleNav}>
+        <IconButton
+          onClick={handleToggleNav}
+          sx={{ display: { xs: 'none', lg: 'inline-flex' } }}
+        >
           <Iconify icon={!collapseDesktop ? 'ri:sidebar-unfold-fill' : 'ri:sidebar-fold-fill'} />
         </IconButton>
 

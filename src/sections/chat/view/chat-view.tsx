@@ -373,6 +373,7 @@ export function ChatView() {
               )}
 
               <ChatMessageInput
+                key={selectedConversationId || 'compose'}
                 recipients={selectedConversationId ? participants : recipients}
                 onAddRecipients={handleAddRecipients}
                 selectedConversationId={selectedConversationId}

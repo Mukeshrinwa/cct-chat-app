@@ -1,7 +1,7 @@
 import type { IChatParticipant } from 'src/types/chat';
 
 import useSWR from 'swr';
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useMemo, useState, useCallback } from 'react';
 
 import Stack from '@mui/material/Stack';
 import Badge from '@mui/material/Badge';
@@ -128,6 +128,14 @@ export function ChatHeaderDetail({
   const singleParticipant = participants[0];
 
   const isBlocked = currentUser?.blockedUsers?.includes(singleParticipant?.id) ?? false;
+
+  const isBlockedByOther = useMemo(() => {
+    if (!conversationId || !rawConversationEntry || rawConversationEntry.type !== 'direct') return false;
+    const {otherUser} = rawConversationEntry;
+    if (!otherUser || !currentUser) return false;
+    const currentUserIdStr = (currentUser.id || currentUser._id || '').toString();
+    return (otherUser.blockedUsers || []).some((id: any) => id.toString() === currentUserIdStr);
+  }, [rawConversationEntry, currentUser, conversationId]);
 
   const isRecording = (recordingUsers[conversationId] || []).includes(singleParticipant?.id);
   const isTyping = (typingUsers[conversationId] || []).includes(singleParticipant?.id);
@@ -383,11 +391,11 @@ export function ChatHeaderDetail({
           }}
         />
 
-        <IconButton onClick={handleAudioCall} disabled={!isUserMember} title="Start audio call">
+        <IconButton onClick={handleAudioCall} disabled={!isUserMember || isBlockedByOther} title="Start audio call">
           <Iconify icon="solar:phone-bold" />
         </IconButton>
 
-        <IconButton onClick={handleVideoCall} disabled={!isUserMember} title="Start video call">
+        <IconButton onClick={handleVideoCall} disabled={!isUserMember || isBlockedByOther} title="Start video call">
           <Iconify icon="solar:videocamera-record-bold" />
         </IconButton>
 
@@ -422,7 +430,7 @@ export function ChatHeaderDetail({
             ref={disappearingAnchorRef}
             onClick={disappearingPopover.onOpen}
             sx={{ justifyContent: 'space-between' }}
-            disabled={!isUserMember}
+            disabled={!isUserMember || isBlockedByOther}
           >
             <Stack direction="row" alignItems="center" spacing={1}>
               <Iconify icon="solar:clock-circle-bold" />

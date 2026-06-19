@@ -1,27 +1,34 @@
 import type { IChatParticipant } from 'src/types/chat';
 
-import { mutate } from 'swr';
+import useSWR, { mutate } from 'swr';
 import { useRef, useMemo, useState, useEffect, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
+import Dialog from '@mui/material/Dialog';
 import Popover from '@mui/material/Popover';
 import Collapse from '@mui/material/Collapse';
 import InputBase from '@mui/material/InputBase';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+import DialogContentText from '@mui/material/DialogContentText';
 
 import { paths } from 'src/routes/paths';
 import { useRouter } from 'src/routes/hooks';
 
-import axios from 'src/utils/axios';
 import { uuidv4 } from 'src/utils/uuidv4';
 import { fData } from 'src/utils/format-number';
+import axios, { fetcher } from 'src/utils/axios';
 import { fSub, today } from 'src/utils/format-time';
 
 import { useSocket } from 'src/socket';
+import { unblockUser } from 'src/api/user';
 import { useChatStore } from 'src/store/useChatStore';
+import { useAuthStore } from 'src/store/useAuthStore';
 import { sendMessage, createConversation } from 'src/actions/chat';
 
 import { toast } from 'src/components/snackbar';
@@ -115,6 +122,76 @@ export function ChatMessageInput({
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { user } = useMockedUser();
+
+  const { user: currentUser, toggleBlockUser } = useAuthStore();
+
+  const { data: rawConversationsData } = useSWR<any>('/api/v1/chats/conversations', fetcher);
+
+  const rawConversationEntry = useMemo(() => {
+    if (!selectedConversationId || !rawConversationsData?.data) return null;
+    return rawConversationsData.data.find((c: any) => c._id === selectedConversationId);
+  }, [rawConversationsData, selectedConversationId]);
+
+  const isBlockedByOther = useMemo(() => {
+    if (!selectedConversationId || !rawConversationEntry || rawConversationEntry.type !== 'direct') return false;
+    const {otherUser} = rawConversationEntry;
+    if (!otherUser || !currentUser) return false;
+    const currentUserIdStr = (currentUser.id || currentUser._id || '').toString();
+    return (otherUser.blockedUsers || []).some((id: any) => id.toString() === currentUserIdStr);
+  }, [rawConversationEntry, currentUser, selectedConversationId]);
+
+  const isBlocked = useMemo(() => {
+    if (recipients.length !== 1) return false;
+    const recipient = recipients[0];
+    const rId = recipient?.id || (recipient as any)?._id;
+    if (!rId) return false;
+    return currentUser?.blockedUsers?.includes(rId) ?? false;
+  }, [recipients, currentUser?.blockedUsers]);
+
+  const [unblockDialogOpen, setUnblockDialogOpen] = useState(false);
+  const [unblocking, setUnblocking] = useState(false);
+  const pendingActionRef = useRef<(() => void) | null>(null);
+
+  const checkBlockAndExecute = useCallback((action: () => void) => {
+    if (isBlocked) {
+      pendingActionRef.current = action;
+      setUnblockDialogOpen(true);
+    } else {
+      action();
+    }
+  }, [isBlocked]);
+
+  const handleConfirmUnblock = useCallback(async () => {
+    if (recipients.length !== 1) return;
+    const recipient = recipients[0];
+    const rId = recipient?.id || (recipient as any)?._id;
+    if (!rId) return;
+
+    setUnblocking(true);
+    try {
+      await unblockUser(rId);
+      toggleBlockUser(rId, false);
+      toast.success(`Unblocked ${recipient.name || 'user'}`);
+      setUnblockDialogOpen(false);
+      
+      // Execute the pending action if any
+      if (pendingActionRef.current) {
+        const action = pendingActionRef.current;
+        pendingActionRef.current = null;
+        action();
+      }
+    } catch (error) {
+      console.error('Failed to unblock user:', error);
+      toast.error('Failed to unblock user');
+    } finally {
+      setUnblocking(false);
+    }
+  }, [recipients, toggleBlockUser]);
+
+  const handleOpenUnblockDialogOnly = useCallback(() => {
+    pendingActionRef.current = null;
+    setUnblockDialogOpen(true);
+  }, []);
 
   const myContact = useMemo(
     () => ({
@@ -252,37 +329,39 @@ export function ChatMessageInput({
 
   const handleSelectGif = useCallback(async (gifUrl: string) => {
     if (!selectedConversationId) return;
-    try {
-      const gifMessageData = {
-        id: uuidv4(),
-        attachments: [
-          {
-            name: 'giphy.gif',
-            size: 0,
-            type: 'image/gif',
-            url: gifUrl,
-            path: gifUrl,
-            preview: gifUrl,
-            createdAt: new Date().toISOString(),
-            modifiedAt: new Date().toISOString(),
-          }
-        ],
-        body: 'gif',
-        contentType: 'document',
-        createdAt: fSub({ minutes: 1 }),
-        senderId: myContact.id,
-        ...(replyingToMessage && {
-          parentMessageId: replyingToMessage._id || replyingToMessage.id || replyingToMessage.messageId,
-          parentId: replyingToMessage._id || replyingToMessage.id || replyingToMessage.messageId
-        }),
-      };
-      await sendMessage(selectedConversationId, gifMessageData);
-      setGifAnchor(null);
-      setReplyingToMessage(null);
-    } catch (error) {
-      console.error('Failed to send GIF:', error);
-    }
-  }, [selectedConversationId, myContact.id, replyingToMessage, setReplyingToMessage]);
+    checkBlockAndExecute(async () => {
+      try {
+        const gifMessageData = {
+          id: uuidv4(),
+          attachments: [
+            {
+              name: 'giphy.gif',
+              size: 0,
+              type: 'image/gif',
+              url: gifUrl,
+              path: gifUrl,
+              preview: gifUrl,
+              createdAt: new Date().toISOString(),
+              modifiedAt: new Date().toISOString(),
+            }
+          ],
+          body: 'gif',
+          contentType: 'document',
+          createdAt: fSub({ minutes: 1 }),
+          senderId: myContact.id,
+          ...(replyingToMessage && {
+            parentMessageId: replyingToMessage._id || replyingToMessage.id || replyingToMessage.messageId,
+            parentId: replyingToMessage._id || replyingToMessage.id || replyingToMessage.messageId
+          }),
+        };
+        await sendMessage(selectedConversationId, gifMessageData);
+        setGifAnchor(null);
+        setReplyingToMessage(null);
+      } catch (error) {
+        console.error('Failed to send GIF:', error);
+      }
+    });
+  }, [selectedConversationId, myContact.id, replyingToMessage, setReplyingToMessage, checkBlockAndExecute]);
 
   const handleFileChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -363,16 +442,20 @@ export function ChatMessageInput({
   );
 
   const handleAttach = useCallback(() => {
-    if (fileRef.current) {
-      fileRef.current.click();
-    }
-  }, []);
+    checkBlockAndExecute(() => {
+      if (fileRef.current) {
+        fileRef.current.click();
+      }
+    });
+  }, [checkBlockAndExecute]);
 
   const handleAttachDoc = useCallback(() => {
-    if (docRef.current) {
-      docRef.current.click();
-    }
-  }, []);
+    checkBlockAndExecute(() => {
+      if (docRef.current) {
+        docRef.current.click();
+      }
+    });
+  }, [checkBlockAndExecute]);
 
   const handleChangeMessage = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const val = event.target.value;
@@ -488,10 +571,10 @@ export function ChatMessageInput({
   const handleSendMessage = useCallback(
     async (event: React.KeyboardEvent<HTMLInputElement>) => {
       if (event.key === 'Enter') {
-        onSubmitMessage();
+        checkBlockAndExecute(onSubmitMessage);
       }
     },
-    [onSubmitMessage]
+    [onSubmitMessage, checkBlockAndExecute]
   );
 
   const [isRecording, setIsRecording] = useState(false);
@@ -621,8 +704,8 @@ export function ChatMessageInput({
   }, [selectedConversationId, recipients, stopRecording, isRecording]);
 
   const handleSendClick = useCallback(async () => {
-    onSubmitMessage();
-  }, [onSubmitMessage]);
+    checkBlockAndExecute(onSubmitMessage);
+  }, [onSubmitMessage, checkBlockAndExecute]);
 
   const handleCancelReply = useCallback(() => {
     setReplyingToMessage(null);
@@ -630,6 +713,40 @@ export function ChatMessageInput({
 
   return (
     <Stack sx={{ position: 'relative' }}>
+      {/* Block Warning Banner (WhatsApp style) */}
+      {isBlocked && (
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="center"
+          spacing={1.5}
+          sx={{
+            py: 1.25,
+            px: 2,
+            bgcolor: (theme) => theme.palette.mode === 'light' ? '#FFF9EB' : '#2A1F00',
+            borderBottom: (theme) => `solid 1px ${theme.vars.palette.divider}`,
+            borderTop: (theme) => `solid 1px ${theme.vars.palette.divider}`,
+          }}
+        >
+          <Iconify icon="solar:forbidden-circle-bold" sx={{ color: '#FFAB00' }} />
+          <Typography variant="body2" sx={{ color: (theme) => theme.palette.mode === 'light' ? '#7A4F01' : '#FFE5B4', fontWeight: 500 }}>
+            You blocked this contact.
+          </Typography>
+          <Button
+            size="small"
+            onClick={handleOpenUnblockDialogOnly}
+            sx={{
+              color: '#FFAB00',
+              fontWeight: 700,
+              p: 0,
+              minWidth: 0,
+              '&:hover': { bgcolor: 'transparent', textDecoration: 'underline' }
+            }}
+          >
+            Tap to unblock
+          </Button>
+        </Stack>
+      )}
       {replyingToMessage && (
         <Stack
           direction="row"
@@ -777,7 +894,33 @@ export function ChatMessageInput({
         </Stack>
       )}
 
-      {isRecording ? (
+      {(!isUserMember || isBlockedByOther) ? (
+        <Stack
+          alignItems="center"
+          justifyContent="center"
+          sx={{
+            py: 2,
+            px: 3,
+            minHeight: 56,
+            bgcolor: 'background.neutral',
+            borderTop: (theme) => `solid 1px ${theme.vars.palette.divider}`,
+            textAlign: 'center',
+            width: '100%',
+          }}
+        >
+          <Stack direction="row" alignItems="center" spacing={1}>
+            <Iconify 
+              icon={!isUserMember ? "solar:info-circle-bold" : "solar:forbidden-circle-bold"} 
+              sx={{ color: 'text.secondary', flexShrink: 0 }} 
+            />
+            <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 500 }}>
+              {!isUserMember 
+                ? "You can't send messages to this group because you're no longer a participant." 
+                : "You cannot send messages to this contact because they blocked you."}
+            </Typography>
+          </Stack>
+        </Stack>
+      ) : isRecording ? (
         <Stack
           direction="row"
           alignItems="center"
@@ -837,40 +980,39 @@ export function ChatMessageInput({
           value={message}
           onKeyUp={handleSendMessage}
           onChange={handleChangeMessage}
-          placeholder={!isUserMember ? "You are no longer a member of this group" : "Type a message"}
-          disabled={disabled || !isUserMember}
+          placeholder="Type a message"
+          disabled={disabled}
           inputProps={{ maxLength: 4000 }}
           startAdornment={
             <Stack direction="row" sx={{ flexShrink: 0 }}>
-              <IconButton onClick={handleOpenEmoji} disabled={isRecording || !isUserMember}>
+              <IconButton onClick={handleOpenEmoji} disabled={isRecording}>
                 <Iconify icon="eva:smiling-face-fill" />
               </IconButton>
-              <IconButton onClick={handleOpenGif} disabled={isRecording || !isUserMember}>
+              <IconButton onClick={handleOpenGif} disabled={isRecording}>
                 <Iconify icon="mdi:gif" />
               </IconButton>
             </Stack>
           }
           endAdornment={
             <Stack direction="row" sx={{ flexShrink: 0 }}>
-              <IconButton onClick={handleAttach} disabled={!isUserMember}>
+              <IconButton onClick={handleAttach}>
                 <Iconify icon="solar:gallery-add-bold" />
               </IconButton>
-              <IconButton onClick={handleAttachDoc} disabled={!isUserMember}>
+              <IconButton onClick={handleAttachDoc}>
                 <Iconify icon="eva:attach-2-fill" />
               </IconButton>
               <IconButton
-                onClick={handleStartRecording}
+                onClick={() => checkBlockAndExecute(handleStartRecording)}
                 color="default"
                 title="Click to record voice note"
-                disabled={!isUserMember}
               >
                 <Iconify icon="solar:microphone-bold" />
               </IconButton>
-              <IconButton onClick={handleSendClick} disabled={(!message.trim() && !pendingFile) || !isUserMember || isUploading}>
+              <IconButton onClick={handleSendClick} disabled={(!message.trim() && !pendingFile) || isUploading}>
                 <Iconify
                   icon="iconamoon:send-fill"
                   sx={{
-                    color: ((message.trim() || pendingFile) && isUserMember) ? 'primary.main' : 'text.disabled',
+                    color: (message.trim() || pendingFile) ? 'primary.main' : 'text.disabled',
                     transition: 'color 0.2s',
                   }}
                 />
@@ -1089,6 +1231,58 @@ export function ChatMessageInput({
           </Stack>
         )}
       </Popover>
+      {/* modern confirmation dialog to unblock user */}
+      <Dialog
+        open={unblockDialogOpen}
+        onClose={() => setUnblockDialogOpen(false)}
+        maxWidth="xs"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 2,
+            p: 1,
+          }
+        }}
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1.5, pb: 1 }}>
+          <Iconify icon="solar:forbidden-circle-bold" width={28} sx={{ color: 'warning.main' }} />
+          <Typography variant="h6" sx={{ fontWeight: 700 }}>
+            Unblock {recipients[0]?.name || 'User'}?
+          </Typography>
+        </DialogTitle>
+
+        <DialogContent>
+          <DialogContentText sx={{ color: 'text.secondary', fontSize: 14 }}>
+            To send this message, you need to unblock {recipients[0]?.name || 'this contact'}. Unblocking will also allow them to message and call you.
+          </DialogContentText>
+        </DialogContent>
+
+        <DialogActions sx={{ px: 3, pb: 2, pt: 1 }}>
+          <Button
+            variant="outlined"
+            color="inherit"
+            onClick={() => setUnblockDialogOpen(false)}
+            disabled={unblocking}
+            sx={{ borderRadius: 1 }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={handleConfirmUnblock}
+            disabled={unblocking}
+            sx={{
+              borderRadius: 1,
+              bgcolor: 'primary.main',
+              color: 'primary.contrastText',
+              '&:hover': { bgcolor: 'primary.dark' },
+            }}
+          >
+            {unblocking ? 'Unblocking...' : 'Unblock'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Stack>
   );
 }

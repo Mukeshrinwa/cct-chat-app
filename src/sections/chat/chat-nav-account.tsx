@@ -1,6 +1,6 @@
 import type { SelectChangeEvent } from '@mui/material/Select';
 
-import { useState, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 
 import Stack from '@mui/material/Stack';
 import Avatar from '@mui/material/Avatar';
@@ -17,6 +17,8 @@ import { svgIconClasses } from '@mui/material/SvgIcon';
 import Badge, { badgeClasses } from '@mui/material/Badge';
 
 import { paths } from 'src/routes/paths';
+
+import { socketManager } from 'src/socket/socket-service';
 
 import { toast } from 'src/components/snackbar';
 import { Iconify } from 'src/components/iconify';
@@ -36,10 +38,33 @@ export function ChatNavAccount() {
 
   const [status, setStatus] = useState<'online' | 'alway' | 'busy' | 'offline'>('online');
 
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('cct_user_presence_status');
+      if (saved && ['online', 'alway', 'busy', 'offline'].includes(saved)) {
+        setStatus(saved as 'online' | 'alway' | 'busy' | 'offline');
+      }
+    } catch (e) {
+      console.error('Failed to load status', e);
+    }
+  }, []);
+
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
 
   const handleChangeStatus = useCallback((event: SelectChangeEvent) => {
-    setStatus(event.target.value as 'online' | 'alway' | 'busy' | 'offline');
+    const newStatus = event.target.value as 'online' | 'alway' | 'busy' | 'offline';
+    setStatus(newStatus);
+    
+    try {
+      localStorage.setItem('cct_user_presence_status', newStatus);
+    } catch (e) {
+      console.error('Failed to save status', e);
+    }
+
+    const socket = socketManager.getSocket();
+    if (socket && socket.connected) {
+      socket.emit('update_presence', { status: newStatus });
+    }
   }, []);
 
   const handleLogout = useCallback(async () => {
@@ -135,10 +160,7 @@ export function ChatNavAccount() {
             Profile
           </MenuItem>
 
-          <MenuItem>
-            <Iconify icon="eva:settings-2-fill" width={24} />
-            Settings
-          </MenuItem>
+ 
         </MenuList>
       </CustomPopover>
 

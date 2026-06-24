@@ -85,7 +85,7 @@ export function ChatRoomGroup({ participants, isUserMember = true }: Props) {
   // ── Derive "In room" participants directly from group API data ──────────
   // Group API returns full user objects in members[] + admins[].
   // We merge them (dedup by id) so the list is always up-to-date without refresh.
-  const groupParticipants: IChatParticipant[] = (() => {
+  const groupParticipants: IChatParticipant[] = useMemo(() => {
     if (!currentGroup) return participants; // fallback while group data loads
 
     const mapGroupUser = (u: any): IChatParticipant => ({
@@ -117,7 +117,7 @@ export function ChatRoomGroup({ participants, isUserMember = true }: Props) {
     (currentGroup.members || []).forEach(addUnique);
 
     return result.length > 0 ? result : participants;
-  })();
+  }, [currentGroup, participants]);
   // ────────────────────────────────────────────────────────────────────────
 
   const collapse = useBoolean(true);

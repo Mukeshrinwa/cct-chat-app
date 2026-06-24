@@ -30,6 +30,7 @@ import {
   pinConversation,
   muteConversation,
   clickConversation,
+  deleteConversation,
   archiveConversation,
 } from 'src/actions/chat';
 
@@ -206,6 +207,20 @@ export function ChatNavItem({
       console.error(error);
     }
   }, [conversation.id, mdUp, onCloseMobile, router]);
+
+  const handleDeleteChat = useCallback(async () => {
+    try {
+      await deleteConversation(conversation.id);
+      toast.success('Chat deleted');
+      // If we are currently viewing this chat, maybe navigate away
+      if (selected) {
+        router.push(paths.dashboard.chat);
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to delete chat');
+    }
+  }, [conversation.id, router, selected]);
 
   const handleClick = useCallback((e: React.MouseEvent) => {
     if (isLongPressRef.current) {
@@ -473,6 +488,26 @@ export function ChatNavItem({
             />
           </ListItemIcon>
           <ListItemText primary={isArchived ? 'Unarchive' : 'Archive'} />
+        </MenuItem>
+
+        <MenuItem
+          onClick={() => {
+            handleDeleteChat();
+            handleMenuClose();
+          }}
+          sx={{ color: 'error.main' }}
+        >
+          <ListItemIcon>
+            <Iconify
+              icon="solar:trash-bin-trash-bold"
+              sx={{
+                width: 20,
+                height: 20,
+                color: 'error.main',
+              }}
+            />
+          </ListItemIcon>
+          <ListItemText primary="Delete Chat" />
         </MenuItem>
       </Menu>
 

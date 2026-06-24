@@ -15,8 +15,7 @@ import ListItemText from '@mui/material/ListItemText';
 import InputAdornment from '@mui/material/InputAdornment';
 import AvatarGroup, { avatarGroupClasses } from '@mui/material/AvatarGroup';
 
-import { paths } from 'src/routes/paths';
-import { useRouter, useSearchParams } from 'src/routes/hooks';
+import { useSearchParams } from 'src/routes/hooks';
 
 import { useResponsive } from 'src/hooks/use-responsive';
 
@@ -34,7 +33,6 @@ import {
   useGetContacts,
   pinConversation,
   muteConversation,
-  deleteConversation,
   useGetConversation,
   archiveConversation,
   setConversationDisappearingMode,
@@ -73,7 +71,6 @@ export function ChatHeaderDetail({
   const disappearingAnchorRef = useRef<HTMLLIElement>(null);
   const { startCall } = useCall();
 
-  const router = useRouter();
 
   const searchParams = useSearchParams();
   const conversationId = searchParams.get('id') || '';
@@ -257,18 +254,6 @@ export function ChatHeaderDetail({
       console.error(err);
     }
   }, [conversationId, popover]);
-
-  const handleDeleteChat = useCallback(async () => {
-    try {
-      await deleteConversation(conversationId);
-      toast.success('Chat deleted');
-      popover.onClose();
-      router.push(paths.dashboard.chat);
-    } catch (err) {
-      toast.error('Failed to delete chat');
-      console.error(err);
-    }
-  }, [conversationId, popover, router]);
 
   const DISAPPEARING_OPTIONS = [
     { value: 'off', label: 'Off', icon: 'solar:close-circle-bold' },
@@ -533,11 +518,6 @@ export function ChatHeaderDetail({
           <MenuItem onClick={handleClearChat} sx={{ color: 'error.main' }}>
             <Iconify icon="solar:trash-bin-trash-bold" />
             Clear Chat
-          </MenuItem>
-
-          <MenuItem onClick={handleDeleteChat} sx={{ color: 'error.main' }}>
-            <Iconify icon="solar:trash-bin-trash-bold" />
-            Delete Chat
           </MenuItem>
         </MenuList>
       </CustomPopover>

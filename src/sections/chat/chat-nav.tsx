@@ -275,8 +275,8 @@ export function ChatNav({
 
   const renderLoading = <ChatNavItemSkeleton />;
 
-  const filteredConversations = conversations.allIds
-    .filter((conversationId) => {
+  const filteredConversations = useMemo(() => conversations.allIds
+      .filter((conversationId) => {
       const isIncluded = archivedIds.includes(conversationId);
       const matchesArchive = showArchived ? isIncluded : !isIncluded;
       if (!matchesArchive) return false;
@@ -306,7 +306,7 @@ export function ChatNav({
       const timeA = lastMsgA?.createdAt ? new Date(lastMsgA.createdAt as any).getTime() : 0;
       const timeB = lastMsgB?.createdAt ? new Date(lastMsgB.createdAt as any).getTime() : 0;
       return timeB - timeA;
-    });
+    }), [conversations, archivedIds, showArchived]);
 
   const renderList = (
     <nav>

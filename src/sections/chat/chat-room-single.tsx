@@ -1,7 +1,7 @@
 import type { IChatParticipant } from 'src/types/chat';
 
 import useSWR from 'swr';
-import { useState, useCallback } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
 import List from '@mui/material/List';
@@ -109,40 +109,38 @@ export function ChatRoomSingle({ participant }: Props) {
   const currentUserId = user?.id || (user as any)?._id || '';
 
   // isMuted from conversation list
-  const currentConvMapped = conversations.allIds
-    .map((id) => conversations.byId[id])
-    .find((c) => c?.id === conversationId);
+  const currentConvMapped = conversations.byId[conversationId];
   const isMuted = currentConvMapped?.isMuted || false;
 
   // ── Shared groups — groups containing this participant ────────────────
-  const sharedGroups = groups.filter((g: any) => {
-    const allIds = [
-      ...(g.admins || []).map((a: any) => a._id || a.id || a),
-      ...(g.members || []).map((m: any) => m._id || m.id || m),
-    ];
-    return allIds.includes(participant?.id);
-  });
+  const sharedGroups = useMemo(() => groups.filter((g: any) => {
+      const allIds = [
+        ...(g.admins || []).map((a: any) => a._id || a.id || a),
+        ...(g.members || []).map((m: any) => m._id || m.id || m),
+      ];
+      return allIds.includes(participant?.id);
+    }), [groups, participant?.id]);
 
   // Groups where current user is admin/owner — for "Add to Group"
-  const myAdminGroups = groups.filter((g: any) => {
-    const ownerId = g.owner?._id || g.owner?.id || g.owner;
-    const adminIds = (g.admins || []).map((a: any) => a._id || a.id || a);
-    const isAdminOrOwner = currentUserId === ownerId || adminIds.includes(currentUserId);
-    if (!isAdminOrOwner) return false;
-    // Only show groups participant is NOT already in
-    const allMemberIds = [
-      ...(g.admins || []).map((a: any) => a._id || a.id || a),
-      ...(g.members || []).map((m: any) => m._id || m.id || m),
-    ];
-    return !allMemberIds.includes(participant?.id);
-  });
+  const myAdminGroups = useMemo(() => groups.filter((g: any) => {
+      const ownerId = g.owner?._id || g.owner?.id || g.owner;
+      const adminIds = (g.admins || []).map((a: any) => a._id || a.id || a);
+      const isAdminOrOwner = currentUserId === ownerId || adminIds.includes(currentUserId);
+      if (!isAdminOrOwner) return false;
+      // Only show groups participant is NOT already in
+      const allMemberIds = [
+        ...(g.admins || []).map((a: any) => a._id || a.id || a),
+        ...(g.members || []).map((m: any) => m._id || m.id || m),
+      ];
+      return !allMemberIds.includes(participant?.id);
+    }), [groups, currentUserId, participant?.id]);
 
   // ── Handlers ──────────────────────────────────────────────────────────
   const handleMessage = useCallback(() => {
     const existingConv = conversations.allIds.find((convId) => {
       const conv = conversations.byId[convId];
       if (!conv || conv.type === 'GROUP' || conv.type === 'group') return false;
-      return conv.participants.some((p) => p.id === participant?.id);
+      return conv.participants.some((p: any) => p.id === participant?.id);
     });
     router.push(existingConv
       ? `${paths.dashboard.chat}?id=${existingConv}`

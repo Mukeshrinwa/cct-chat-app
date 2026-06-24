@@ -230,7 +230,7 @@ export function SocketProvider({ children }: SocketProviderProps) {
       if (activeConvId && activeConvId === senderId && conversationId && conversationId !== activeConvId) {
         console.log(`[FIRST_TIME_MESSAGE] Active ID was recipient ID: ${activeConvId}, updating to new conversation ID: ${conversationId}`);
         useChatStore.getState().setActiveConversation(conversationId);
-        
+
         // Update URL
         const url = new URL(window.location.href);
         url.searchParams.set('id', conversationId);
@@ -257,16 +257,18 @@ export function SocketProvider({ children }: SocketProviderProps) {
         .updateConversationLastMessage(normalized.conversationId!, normalized, loggedInUserId);
 
       if (conversationId && conversationId === activeConvId && senderId !== currentUserId) {
-        // Emit mark_read to socket immediately (bypass clickConversation debounce for instant read ticks)
-        socketInstance.emit('mark_read', { conversationId });
-        
-        // Mark as read in backend via HTTP API instantly
-        axios.post(`/api/v1/chats/read/${conversationId}`).catch((err) => {
-          console.error('[NEW_MESSAGE_READ] HTTP mark read error:', err);
-        });
+        if (document.visibilityState === 'visible') {
+          // Emit mark_read to socket immediately (bypass clickConversation debounce for instant read ticks)
+          socketInstance.emit('mark_read', { conversationId });
 
-        // Trigger clickConversation for SWR mutate list update
-        clickConversation(conversationId);
+          // Mark as read in backend via HTTP API instantly
+          axios.post(`/api/v1/chats/read/${conversationId}`).catch((err) => {
+            console.error('[NEW_MESSAGE_READ] HTTP mark read error:', err);
+          });
+
+          // Trigger clickConversation for SWR mutate list update
+          clickConversation(conversationId);
+        }
       }
 
       const parsedMessage = {
@@ -395,14 +397,14 @@ export function SocketProvider({ children }: SocketProviderProps) {
                 messages: current.conversation.messages.map((m: any) =>
                   (m.id === messageId || m._id === messageId || m.id === normalized._id)
                     ? {
-                        ...m,
-                        body: normalized.text,
-                        attachments: normalized.attachments,
-                        editedAt: normalized.editedAt,
-                        isDeleted: normalized.isDeletedForEveryone,
-                        status: normalized.status,
-                        reactions: normalized.reactions,
-                      }
+                      ...m,
+                      body: normalized.text,
+                      attachments: normalized.attachments,
+                      editedAt: normalized.editedAt,
+                      isDeleted: normalized.isDeletedForEveryone,
+                      status: normalized.status,
+                      reactions: normalized.reactions,
+                    }
                     : m
                 ),
               },
@@ -459,11 +461,11 @@ export function SocketProvider({ children }: SocketProviderProps) {
                 messages: current.conversation.messages.map((m: any) =>
                   (m.id === messageId || m._id === messageId)
                     ? {
-                        ...m,
-                        body: 'This message was deleted.',
-                        isDeleted: true,
-                        contentType: 'text',
-                      }
+                      ...m,
+                      body: 'This message was deleted.',
+                      isDeleted: true,
+                      contentType: 'text',
+                    }
                     : m
                 ),
               },
@@ -541,7 +543,7 @@ export function SocketProvider({ children }: SocketProviderProps) {
       const key = `${conversationId}-${userId}`;
 
       // Resolve name from store
-      const {conversations} = useChatStore.getState();
+      const { conversations } = useChatStore.getState();
       let typingName = 'Someone';
       let targetConvId = conversationId;
 
@@ -614,7 +616,7 @@ export function SocketProvider({ children }: SocketProviderProps) {
         const { conversationId, userId, recording } = payload;
         if (userId === currentUserId) return;
 
-        const {conversations} = useChatStore.getState();
+        const { conversations } = useChatStore.getState();
         let recordingName = 'Someone';
         let targetConvId = conversationId;
 
@@ -729,12 +731,12 @@ export function SocketProvider({ children }: SocketProviderProps) {
                         if (pId === data.userId) {
                           return typeof p === 'object'
                             ? {
-                                ...p,
-                                ...data,
-                                name: data.name !== undefined ? data.name : p.name,
-                                avatar: data.avatar !== undefined ? data.avatar : p.avatar,
-                                about: data.about !== undefined ? data.about : p.about,
-                              }
+                              ...p,
+                              ...data,
+                              name: data.name !== undefined ? data.name : p.name,
+                              avatar: data.avatar !== undefined ? data.avatar : p.avatar,
+                              about: data.about !== undefined ? data.about : p.about,
+                            }
                             : p;
                         }
                         return p;

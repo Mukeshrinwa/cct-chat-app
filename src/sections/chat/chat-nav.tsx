@@ -140,7 +140,7 @@ export function ChatNav({
     conversations.allIds.forEach((convId) => {
       const conv = conversations.byId[convId];
       if (!conv) return;
-      
+
       // Exclude group conversations so we only show users we have chatted with directly
       const isGroup = conv.type === 'GROUP' || conv.type === 'group';
       if (isGroup) return;
@@ -294,13 +294,13 @@ export function ChatNav({
     .sort((a, b) => {
       const convA = conversations.byId[a];
       const convB = conversations.byId[b];
-      
+
       const pinA = convA?.isPinned ? 1 : 0;
       const pinB = convB?.isPinned ? 1 : 0;
       if (pinA !== pinB) {
         return pinB - pinA;
       }
-      
+
       const lastMsgA = convA?.messages?.[convA.messages.length - 1];
       const lastMsgB = convB?.messages?.[convB.messages.length - 1];
       const timeA = lastMsgA?.createdAt ? new Date(lastMsgA.createdAt as any).getTime() : 0;

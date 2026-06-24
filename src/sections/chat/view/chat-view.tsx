@@ -201,9 +201,25 @@ export function ChatView() {
   useEffect(() => {
     setActiveConversation(selectedConversationId || null);
     setSearchMessageQuery('');
+    
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && selectedConversationId) {
+        clickConversation(selectedConversationId);
+      }
+    };
+
     if (selectedConversationId) {
-      clickConversation(selectedConversationId);
+      if (document.visibilityState === 'visible') {
+        clickConversation(selectedConversationId);
+      }
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      window.addEventListener('focus', handleVisibilityChange);
     }
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleVisibilityChange);
+    };
   }, [selectedConversationId, setActiveConversation]);
 
   useEffect(() => {

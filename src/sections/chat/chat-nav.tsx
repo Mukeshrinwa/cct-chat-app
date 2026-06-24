@@ -126,6 +126,9 @@ export function ChatNav({
     setArchivedIds((prev) => {
       const updated = prev.filter((item) => item !== id);
       localStorage.setItem('cct_archived_conversations', JSON.stringify(updated));
+      if (updated.length === 0) {
+        setShowArchived(false);
+      }
       return updated;
     });
   }, []);
@@ -272,53 +275,62 @@ export function ChatNav({
 
   const renderLoading = <ChatNavItemSkeleton />;
 
+  const filteredConversations = conversations.allIds
+    .filter((conversationId) => {
+      const isIncluded = archivedIds.includes(conversationId);
+      const matchesArchive = showArchived ? isIncluded : !isIncluded;
+      if (!matchesArchive) return false;
+
+      const conv = conversations.byId[conversationId];
+      if (!conv) return false;
+
+      const isGroup = conv.type === 'GROUP' || conv.type === 'group';
+      if (!isGroup && (!conv.messages || conv.messages.length === 0)) {
+        return false;
+      }
+
+      return true;
+    })
+    .sort((a, b) => {
+      const convA = conversations.byId[a];
+      const convB = conversations.byId[b];
+      
+      const pinA = convA?.isPinned ? 1 : 0;
+      const pinB = convB?.isPinned ? 1 : 0;
+      if (pinA !== pinB) {
+        return pinB - pinA;
+      }
+      
+      const lastMsgA = convA?.messages?.[convA.messages.length - 1];
+      const lastMsgB = convB?.messages?.[convB.messages.length - 1];
+      const timeA = lastMsgA?.createdAt ? new Date(lastMsgA.createdAt as any).getTime() : 0;
+      const timeB = lastMsgB?.createdAt ? new Date(lastMsgB.createdAt as any).getTime() : 0;
+      return timeB - timeA;
+    });
+
   const renderList = (
     <nav>
       <Box component="ul">
-        {conversations.allIds
-          .filter((conversationId) => {
-            const isIncluded = archivedIds.includes(conversationId);
-            const matchesArchive = showArchived ? isIncluded : !isIncluded;
-            if (!matchesArchive) return false;
-
-            const conv = conversations.byId[conversationId];
-            if (!conv) return false;
-
-            const isGroup = conv.type === 'GROUP' || conv.type === 'group';
-            if (!isGroup && (!conv.messages || conv.messages.length === 0)) {
-              return false;
-            }
-
-            return true;
-          })
-          .sort((a, b) => {
-            const convA = conversations.byId[a];
-            const convB = conversations.byId[b];
-            
-            const pinA = convA?.isPinned ? 1 : 0;
-            const pinB = convB?.isPinned ? 1 : 0;
-            if (pinA !== pinB) {
-              return pinB - pinA;
-            }
-            
-            const lastMsgA = convA?.messages?.[convA.messages.length - 1];
-            const lastMsgB = convB?.messages?.[convB.messages.length - 1];
-            const timeA = lastMsgA?.createdAt ? new Date(lastMsgA.createdAt as any).getTime() : 0;
-            const timeB = lastMsgB?.createdAt ? new Date(lastMsgB.createdAt as any).getTime() : 0;
-            return timeB - timeA;
-          })
-          .map((conversationId) => (
-            <ChatNavItem
-              key={conversationId}
-              collapse={collapseDesktop}
-              conversation={conversations.byId[conversationId]}
-              selected={conversationId === selectedConversationId}
-              onCloseMobile={onCloseMobile}
-              isArchived={archivedIds.includes(conversationId)}
-              onArchive={handleArchive}
-              onUnarchive={handleUnarchive}
-            />
-          ))}
+        {showArchived && filteredConversations.length === 0 && (
+          <Stack alignItems="center" justifyContent="center" sx={{ height: 200 }}>
+            <Iconify icon="solar:archive-broken" width={48} sx={{ color: 'text.disabled', mb: 2 }} />
+            <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+              No Archived Chats
+            </Typography>
+          </Stack>
+        )}
+        {filteredConversations.map((conversationId) => (
+          <ChatNavItem
+            key={conversationId}
+            collapse={collapseDesktop}
+            conversation={conversations.byId[conversationId]}
+            selected={conversationId === selectedConversationId}
+            onCloseMobile={onCloseMobile}
+            isArchived={archivedIds.includes(conversationId)}
+            onArchive={handleArchive}
+            onUnarchive={handleUnarchive}
+          />
+        ))}
       </Box>
     </nav>
   );
@@ -343,7 +355,7 @@ export function ChatNav({
     </Stack>
   );
 
-  const renderArchivedBar = (!collapseDesktop || !mdUp) && !searchContacts.query && (
+  const renderArchivedBar = (!collapseDesktop || !mdUp) && !searchContacts.query && archivedIds.length > 0 && (
     <Box
       onClick={() => setShowArchived(true)}
       sx={{

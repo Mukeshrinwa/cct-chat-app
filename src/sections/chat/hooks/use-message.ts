@@ -30,5 +30,14 @@ export function useMessage({ message, participants, currentUserId }: Props) {
       (message.body.startsWith('data:image/') ||
         /\.(jpeg|jpg|gif|png|webp)($|\?)/i.test(message.body) || message.body.includes('giphy.com')));
 
-  return { hasImage, me, senderDetails };
+  const hasVideo =
+    message.contentType === 'video' ||
+    firstAttachmentType.startsWith('video/') ||
+    (typeof firstAttachmentUrl === 'string' &&
+      /\.(mp4|webm|ogg|mov)($|\?)/i.test(firstAttachmentUrl)) ||
+    (typeof message.body === 'string' &&
+      (message.body.startsWith('data:video/') ||
+        /\.(mp4|webm|ogg|mov)($|\?)/i.test(message.body)));
+
+  return { hasImage, hasVideo, me, senderDetails };
 }

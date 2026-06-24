@@ -1,6 +1,6 @@
 import type { IChatConversation } from 'src/types/chat';
 
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useMemo, useState, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
 import Menu from '@mui/material/Menu';
@@ -25,11 +25,12 @@ import { fToNow } from 'src/utils/format-time';
 import { useSocket } from 'src/socket';
 import { useGetGroups } from 'src/actions/group';
 import { useGroupStore } from 'src/store/useGroupStore';
-import { 
-  pinConversation, 
-  muteConversation, 
-  clickConversation, 
-  archiveConversation 
+import {
+  useGetContacts,
+  pinConversation,
+  muteConversation,
+  clickConversation,
+  archiveConversation,
 } from 'src/actions/chat';
 
 import { toast } from 'src/components/snackbar';
@@ -52,10 +53,10 @@ type Props = {
   onUnarchive?: (id: string) => void;
 };
 
-export function ChatNavItem({ 
-  selected, 
-  collapse, 
-  conversation, 
+export function ChatNavItem({
+  selected,
+  collapse,
+  conversation,
   onCloseMobile,
   isArchived,
   onArchive,
@@ -181,8 +182,16 @@ export function ChatNavItem({
 
   const name = singleParticipant?.name ?? '';
   const avatarUrl = singleParticipant?.avatarUrl ?? '';
+
+  const { contacts } = useGetContacts();
+  const isContact = useMemo(() => contacts.some((c: any) => c.id === singleParticipant?.id || c._id === singleParticipant?.id), [contacts, singleParticipant?.id]);
+
+  const lastSeenPrivacy = singleParticipant?.privacy?.lastSeen || 'everyone';
+  const canSeeLastSeen = lastSeenPrivacy === 'everyone' || (lastSeenPrivacy === 'contacts' && isContact);
+
   const isRealtimeOnline = singleParticipant ? onlineUsers.has(singleParticipant.id) : false;
-  const status = isRealtimeOnline ? 'online' : (singleParticipant?.status ?? 'invisible');
+  const actualStatus = isRealtimeOnline ? 'online' : (singleParticipant?.status ?? 'invisible');
+  const status = canSeeLastSeen ? actualStatus : 'invisible';
 
   const handleClickConversation = useCallback(async () => {
     try {
@@ -228,9 +237,9 @@ export function ChatNavItem({
   );
 
   const renderSingle = (
-    <Badge 
-      key={status} 
-      variant={status} 
+    <Badge
+      key={status}
+      variant={status}
       anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
       onClick={handleAvatarClick}
       sx={{ cursor: 'pointer', '&:hover': { opacity: 0.85 } }}

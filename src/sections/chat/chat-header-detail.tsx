@@ -31,6 +31,7 @@ import { blockUser, unblockUser } from 'src/api/user';
 import { useGroupStore } from 'src/store/useGroupStore';
 import {
   clearChat,
+  useGetContacts,
   pinConversation,
   muteConversation,
   deleteConversation,
@@ -147,9 +148,16 @@ export function ChatHeaderDetail({
 
   const isRecording = (recordingUsers[conversationId] || []).includes(singleParticipant?.id);
   const isTyping = (typingUsers[conversationId] || []).includes(singleParticipant?.id);
-  const isRealtimeOnline = onlineUsers.has(singleParticipant?.id);
 
-  const statusToDisplay = isRealtimeOnline ? 'online' : singleParticipant?.status;
+  const { contacts } = useGetContacts();
+  const isContact = useMemo(() => contacts.some((c: any) => c.id === singleParticipant?.id || c._id === singleParticipant?.id), [contacts, singleParticipant?.id]);
+
+  const lastSeenPrivacy = singleParticipant?.privacy?.lastSeen || 'everyone';
+  const canSeeLastSeen = lastSeenPrivacy === 'everyone' || (lastSeenPrivacy === 'contacts' && isContact);
+
+  const isRealtimeOnline = onlineUsers.has(singleParticipant?.id);
+  const actualStatus = isRealtimeOnline ? 'online' : singleParticipant?.status || 'offline';
+  const statusToDisplay = canSeeLastSeen ? actualStatus : 'offline';
 
 
 
@@ -382,6 +390,8 @@ export function ChatHeaderDetail({
             <span style={{ color: '#00a884', fontWeight: 600 }}>Recording audio... 🎙️</span>
           ) : isTyping ? (
             <span style={{ color: '#00a884', fontWeight: 600 }}>typing...</span>
+          ) : !canSeeLastSeen ? (
+            null
           ) : statusToDisplay === 'offline' ? (
             fToNow(singleParticipant?.lastActivity)
           ) : (
@@ -463,7 +473,10 @@ export function ChatHeaderDetail({
           </MenuItem>
 
           <MenuItem onClick={handlePin}>
-            <Iconify icon={isPinned ? 'solar:pin-slash-bold' : 'solar:pin-bold'} />
+            <Iconify 
+              icon="solar:pin-bold" 
+              sx={isPinned ? { transform: 'rotate(0deg)', color: 'primary.main' } : { transform: 'rotate(45deg)' }} 
+            />
             {isPinned ? 'Unpin' : 'Pin'}
           </MenuItem>
 

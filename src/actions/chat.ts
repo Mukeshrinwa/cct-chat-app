@@ -33,6 +33,7 @@ function mapUserToParticipant(user: any): IChatParticipant {
     phoneNumber: user.mobile || user.phoneNumber || '',
     lastActivity: user.lastSeen || new Date().toISOString(),
     status: user.lastSeen === 'online' ? 'online' : 'offline',
+    privacy: user.privacy || undefined,
   };
 }
 

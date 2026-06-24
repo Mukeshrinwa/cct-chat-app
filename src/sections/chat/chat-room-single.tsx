@@ -98,7 +98,13 @@ export function ChatRoomSingle({ participant }: Props) {
 
   // ── Derived state ─────────────────────────────────────────────────────
   const isMe = user?.id === participant?.id;
-  const isOnline = onlineUsers.has(participant?.id);
+  
+  const isContact = contacts.some((c: any) => c.id === participant?.id || c._id === participant?.id);
+  const lastSeenPrivacy = participant?.privacy?.lastSeen || 'everyone';
+  const canSeeLastSeen = lastSeenPrivacy === 'everyone' || (lastSeenPrivacy === 'contacts' && isContact);
+  
+  const isOnline = canSeeLastSeen ? onlineUsers.has(participant?.id) : false;
+  
   const isBlocked = currentUser?.blockedUsers?.includes(participant?.id) ?? false;
   const currentUserId = user?.id || (user as any)?._id || '';
 
@@ -318,12 +324,14 @@ export function ChatRoomSingle({ participant }: Props) {
           </Typography>
         )}
 
-        <Typography
-          variant="caption"
-          sx={{ mt: 0.5, color: isOnline ? 'success.main' : 'text.disabled', fontWeight: 600 }}
-        >
-          {isOnline ? '● Online' : '● Offline'}
-        </Typography>
+        {canSeeLastSeen && (
+          <Typography
+            variant="caption"
+            sx={{ mt: 0.5, color: isOnline ? 'success.main' : 'text.disabled', fontWeight: 600 }}
+          >
+            {isOnline ? '● Online' : '● Offline'}
+          </Typography>
+        )}
       </Stack>
 
       <Divider />

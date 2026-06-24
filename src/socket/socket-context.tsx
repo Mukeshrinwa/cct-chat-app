@@ -687,6 +687,7 @@ export function SocketProvider({ children }: SocketProviderProps) {
                           name: data.name !== undefined ? data.name : p.name,
                           avatarUrl: data.avatar !== undefined ? data.avatar : p.avatarUrl,
                           about: data.about !== undefined ? data.about : p.about,
+                          privacy: data.privacy !== undefined ? data.privacy : p.privacy,
                         };
                       }
                       return p;

@@ -111,7 +111,7 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
   const highlightedMessageId = searchParams.get('messageId') || '';
   const isHighlighted = highlightedMessageId === message.id;
 
-  const { me, senderDetails, hasImage } = useMessage({
+  const { me, senderDetails, hasImage, hasVideo } = useMessage({
     message,
     participants,
     currentUserId: `${user?.id}`,
@@ -132,7 +132,7 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
   const getCaptionText = () => {
     if (!body || typeof body !== 'string') return '';
     const cleanBody = body.trim();
-    if (cleanBody.startsWith('data:image/') || cleanBody.startsWith('data:audio/')) return '';
+    if (cleanBody.startsWith('data:image/') || cleanBody.startsWith('data:audio/') || cleanBody.startsWith('data:video/')) return '';
     if (cleanBody === 'gif') return '';
     if (cleanBody === imageUrl) return '';
     
@@ -141,7 +141,7 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
       if (cleanBody === att.preview || cleanBody === att.url || cleanBody === att.path) return '';
     }
     
-    if (/^https?:\/\/.*\.(jpeg|jpg|gif|png|webp)/i.test(cleanBody)) {
+    if (/^https?:\/\/.*\.(jpeg|jpg|gif|png|webp|mp4|webm|ogg|mov)/i.test(cleanBody)) {
       return '';
     }
     
@@ -259,6 +259,19 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
         /\.(mp3|wav|ogg|aac|webm)($|\?)/i.test(att.preview || '')
     )?.preview;
     if (attUrl) return attUrl;
+    return getMediaUrl(body);
+  })();
+
+  const videoUrl = (() => {
+    const attUrl = message.attachments?.find(
+      (att: any) =>
+        att.type?.startsWith('video/') ||
+        /\.(mp4|webm|ogg|mov)($|\?)/i.test(att.name || '') ||
+        /\.(mp4|webm|ogg|mov)($|\?)/i.test(att.preview || '') ||
+        /\.(mp4|webm|ogg|mov)($|\?)/i.test(att.url || '') ||
+        /\.(mp4|webm|ogg|mov)($|\?)/i.test(att.path || '')
+    );
+    if (attUrl) return attUrl.url || attUrl.preview || attUrl.path;
     return getMediaUrl(body);
   })();
 
@@ -484,8 +497,8 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
         wordBreak: 'break-word',
         whiteSpace: 'pre-wrap',
         ...(me && { color: 'grey.800', bgcolor: 'primary.lighter' }),
-        ...(hasImage && !captionText && { p: 0, bgcolor: 'transparent' }),
-        ...(hasImage && captionText && { p: 0.75 }),
+        ...(hasImage && !captionText && !hasVideo && { p: 0, bgcolor: 'transparent' }),
+        ...((hasImage || hasVideo) && captionText && { p: 0.75 }),
         ...(message.isDeleted && {
           color: 'text.disabled',
           fontStyle: 'italic',
@@ -649,6 +662,35 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
                   objectFit: 'cover',
                   aspectRatio: '16/11',
                   '&:hover': { opacity: 0.9 },
+                }}
+              />
+              {captionText && (
+                <Typography
+                  variant="body2"
+                  sx={{
+                    px: 0.5,
+                    pb: 0.5,
+                    color: me ? 'grey.800' : 'text.primary',
+                  }}
+                >
+                  {renderTextWithLinks(captionText)}
+                </Typography>
+              )}
+            </Stack>
+          ) : hasVideo ? (
+            <Stack spacing={1} sx={{ width: '100%' }}>
+              <Box
+                component="video"
+                controls
+                src={videoUrl}
+                sx={{
+                  width: 1,
+                  maxWidth: { xs: 240, sm: 320, md: 400 },
+                  height: 'auto',
+                  borderRadius: 1,
+                  objectFit: 'cover',
+                  outline: 'none',
+                  bgcolor: 'common.black',
                 }}
               />
               {captionText && (

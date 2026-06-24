@@ -49,6 +49,12 @@ export type IChatParticipant = {
   phoneNumber: string;
   lastActivity: IDateValue;
   status: 'online' | 'offline' | 'alway' | 'busy';
+  privacy?: {
+    lastSeen?: 'everyone' | 'contacts' | 'nobody';
+    profilePhoto?: 'everyone' | 'contacts' | 'nobody';
+    about?: 'everyone' | 'contacts' | 'nobody';
+    readReceipts?: boolean;
+  };
 };
 
 export type IChatConversation = {

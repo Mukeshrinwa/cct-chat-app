@@ -1,6 +1,7 @@
 import Zoom from 'yet-another-react-lightbox/plugins/zoom';
 import Video from 'yet-another-react-lightbox/plugins/video';
 import Captions from 'yet-another-react-lightbox/plugins/captions';
+import Download from 'yet-another-react-lightbox/plugins/download';
 import Slideshow from 'yet-another-react-lightbox/plugins/slideshow';
 import Fullscreen from 'yet-another-react-lightbox/plugins/fullscreen';
 import Thumbnails from 'yet-another-react-lightbox/plugins/thumbnails';
@@ -66,6 +67,7 @@ export function Lightbox({
         iconNext: () => <Iconify width={32} icon="carbon:chevron-right" />,
         iconExitFullscreen: () => <Iconify width={24} icon="carbon:center-to-fit" />,
         iconEnterFullscreen: () => <Iconify width={24} icon="carbon:fit-to-screen" />,
+        iconDownload: () => <Iconify width={24} icon="carbon:download" />,
       }}
       className={lightboxClasses.root}
       {...other}
@@ -83,7 +85,7 @@ export function getPlugins({
   disableThumbnails,
   disableFullscreen,
 }: Partial<LightBoxProps>) {
-  let plugins = [Captions, Fullscreen, Slideshow, Thumbnails, Video, Zoom];
+  let plugins = [Captions, Fullscreen, Slideshow, Thumbnails, Video, Zoom, Download];
 
   if (disableThumbnails) {
     plugins = plugins.filter((plugin) => plugin !== Thumbnails);

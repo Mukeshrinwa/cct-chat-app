@@ -20,11 +20,11 @@ import { fToNow } from 'src/utils/format-time';
 import { CONFIG } from 'src/config-global';
 import { useGetGroups } from 'src/actions/group';
 import { useChatStore } from 'src/store/useChatStore';
-import { 
+import {
   useGetContacts,
   clickConversation,
-  getMessageContext, 
-  useGetConversation, 
+  getMessageContext,
+  useGetConversation,
   createConversation,
   useGetConversations,
   searchConversationMessages
@@ -84,7 +84,7 @@ export function ChatView() {
   useEffect(() => {
     if (!searchMessageQuery.trim() || !selectedConversationId) {
       setSearchResults([]);
-      return () => {};
+      return () => { };
     }
 
     const delayDebounce = setTimeout(async () => {
@@ -153,17 +153,17 @@ export function ChatView() {
 
   const isUserMember = useMemo(() => {
     if (!conversation) return true;
-    
+
     const inParticipants = conversation.participants.some(
       (participant: any) => (participant.id || participant._id) === `${user?.id}`
     );
 
     const convType = conversation.type?.toLowerCase() || '';
-    const isGroupConv = 
-      convType === 'group' || 
+    const isGroupConv =
+      convType === 'group' ||
       conversation.participants.length > 2 ||
-      groups.some((g: any) => 
-        g.conversationId?._id === selectedConversationId || 
+      groups.some((g: any) =>
+        g.conversationId?._id === selectedConversationId ||
         g.conversationId === selectedConversationId ||
         g._id === selectedConversationId ||
         g.id === selectedConversationId
@@ -173,14 +173,14 @@ export function ChatView() {
       if (groupsLoading && inParticipants) {
         return true; // Prevent flicker while loading
       }
-      
-      const currentGroup = groups.find((g: any) => 
-        g.conversationId?._id === selectedConversationId || 
+
+      const currentGroup = groups.find((g: any) =>
+        g.conversationId?._id === selectedConversationId ||
         g.conversationId === selectedConversationId ||
         g._id === selectedConversationId ||
         g.id === selectedConversationId
       );
-      
+
       if (!currentGroup && !groupsLoading) {
         return false;
       }
@@ -188,7 +188,7 @@ export function ChatView() {
       if (currentGroup) {
         const isAdmin = (currentGroup.admins || []).some((a: any) => (a.id || a._id || a) === user?.id);
         const isMember = (currentGroup.members || []).some((m: any) => (m.id || m._id || m) === user?.id);
-        
+
         if (!isAdmin && !isMember) {
           return false;
         }
@@ -372,14 +372,16 @@ export function ChatView() {
                 />
               )}
 
-              <ChatMessageInput
-                key={selectedConversationId || 'compose'}
-                recipients={selectedConversationId ? participants : recipients}
-                onAddRecipients={handleAddRecipients}
-                selectedConversationId={selectedConversationId}
-                disabled={!recipients.length && !selectedConversationId}
-                isUserMember={isUserMember}
-              />
+              {(selectedConversationId || recipients.length > 0) && (
+                <ChatMessageInput
+                  key={selectedConversationId || 'compose'}
+                  recipients={selectedConversationId ? participants : recipients}
+                  onAddRecipients={handleAddRecipients}
+                  selectedConversationId={selectedConversationId}
+                  disabled={!recipients.length && !selectedConversationId}
+                  isUserMember={isUserMember}
+                />
+              )}
             </>
           ),
           details: selectedConversationId && (

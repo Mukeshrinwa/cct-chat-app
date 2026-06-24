@@ -339,6 +339,11 @@ async function fetchConversationDetail(conversationId: string, currentUser: any)
     });
   }
 
+  if (conversationData && conversationData.otherUser && typeof conversationData.otherUser === 'object') {
+    const id = conversationData.otherUser._id || conversationData.otherUser.id;
+    if (id) conversationParticipantsMap.set(id, conversationData.otherUser);
+  }
+
   const messageUsersMap = new Map();
   messages.forEach((msg: any) => {
     if (msg.senderDetails && typeof msg.senderDetails === 'object') {
@@ -370,6 +375,15 @@ async function fetchConversationDetail(conversationId: string, currentUser: any)
   if (otherUser) {
     const oId = otherUser._id || otherUser.id;
     if (oId && typeof oId === 'string') participantIds.add(oId);
+  }
+
+  if (conversationData && conversationData.otherUser) {
+    const oId = conversationData.otherUser._id || conversationData.otherUser.id;
+    if (oId && typeof oId === 'string') participantIds.add(oId);
+  }
+
+  if (usersMap.has(conversationId)) {
+    participantIds.add(conversationId);
   }
 
   const participants: IChatParticipant[] = [];
@@ -991,6 +1005,7 @@ export function useGetMessageById(conversationId: string, messageId: string | un
 
 export async function muteConversation(conversationId: string, isMuted: boolean) {
   const body = {
+    mute: isMuted,
     isMuted,
     notificationMode: isMuted ? 'MUTED' : 'ALL',
     muteUntil: isMuted ? new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toISOString() : null

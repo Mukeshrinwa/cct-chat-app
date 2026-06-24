@@ -328,7 +328,12 @@ export function ChatHeaderDetail({
       )}
 
       <ListItemText
-        primary={currentGroup?.groupName || 'Group Chat'}
+        primary={
+          <Stack direction="row" alignItems="center" spacing={0.5}>
+            <span>{currentGroup?.groupName || 'Group Chat'}</span>
+            {isMuted && <Iconify icon="solar:bell-off-bold" width={16} sx={{ color: 'text.disabled' }} />}
+          </Stack>
+        }
         secondary={
           groupTypingText ? (
             <span style={{ color: '#00a884', fontWeight: 600 }}>{groupTypingText}</span>
@@ -366,7 +371,12 @@ export function ChatHeaderDetail({
       </Badge>
 
       <ListItemText
-        primary={singleParticipant?.name}
+        primary={
+          <Stack direction="row" alignItems="center" spacing={0.5}>
+            <span>{singleParticipant?.name}</span>
+            {isMuted && <Iconify icon="solar:bell-off-bold" width={16} sx={{ color: 'text.disabled' }} />}
+          </Stack>
+        }
         secondary={
           isRecording ? (
             <span style={{ color: '#00a884', fontWeight: 600 }}>Recording audio... 🎙️</span>

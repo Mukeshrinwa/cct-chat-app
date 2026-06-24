@@ -22,6 +22,7 @@ import { useResponsive } from 'src/hooks/use-responsive';
 
 import { fToNow } from 'src/utils/format-time';
 
+import { useSocket } from 'src/socket';
 import { useGetGroups } from 'src/actions/group';
 import { useGroupStore } from 'src/store/useGroupStore';
 import { 
@@ -62,6 +63,7 @@ export function ChatNavItem({
 }: Props) {
   const [hovered, setHovered] = useState(false);
   const { user } = useMockedUser();
+  const { onlineUsers } = useSocket();
 
   const [avatarPreviewOpen, setAvatarPreviewOpen] = useState(false);
 
@@ -153,8 +155,12 @@ export function ChatNavItem({
 
   const router = useRouter();
 
-  const { group, displayName, displayText, participants, lastActivity, hasOnlineInGroup } =
+  const { group, displayName, displayText, participants, lastActivity } =
     useNavItem({ conversation, currentUserId: `${user?.id}` });
+
+  const hasOnlineInGroup = group
+    ? participants.some((item) => item.status === 'online' || onlineUsers.has(item.id))
+    : false;
 
   const { groups } = useGetGroups();
   const groupStoreGroups = useGroupStore((state) => state.groups);
@@ -175,7 +181,8 @@ export function ChatNavItem({
 
   const name = singleParticipant?.name ?? '';
   const avatarUrl = singleParticipant?.avatarUrl ?? '';
-  const status = singleParticipant?.status ?? 'invisible';
+  const isRealtimeOnline = singleParticipant ? onlineUsers.has(singleParticipant.id) : false;
+  const status = isRealtimeOnline ? 'online' : (singleParticipant?.status ?? 'invisible');
 
   const handleClickConversation = useCallback(async () => {
     try {

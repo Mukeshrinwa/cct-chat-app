@@ -99,7 +99,7 @@ export function InviteModal({ open, onClose, roomId }: Props) {
       }
 
       const res: InviteResponse = await InviteService.createInvite(paramsToSubmit);
-      
+
       const link = buildJoinUrl(res.inviteCode, res.token);
       setGeneratedLink(link);
       setInviteStatus(res.revoked ? 'revoked' : res.isActive ? 'active' : 'expired');
@@ -137,7 +137,7 @@ export function InviteModal({ open, onClose, roomId }: Props) {
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
       <DialogTitle>Generate Invite Link</DialogTitle>
-      
+
       <DialogContent sx={{ pb: 3, pt: 1 }}>
         {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
 
@@ -221,7 +221,7 @@ export function InviteModal({ open, onClose, roomId }: Props) {
             <Typography variant="subtitle2" sx={{ mb: 1, color: 'text.secondary' }}>
               Generated Link (Status: {inviteStatus})
             </Typography>
-            
+
             <TextField
               fullWidth
               value={generatedLink}
@@ -236,7 +236,7 @@ export function InviteModal({ open, onClose, roomId }: Props) {
                 ),
               }}
             />
-            
+
             <Stack direction="row" spacing={2} sx={{ mt: 3 }}>
               <Button fullWidth variant="contained" onClick={handleShare} startIcon={<Iconify icon="solar:share-bold" />}>
                 Share
@@ -257,11 +257,11 @@ export function InviteModal({ open, onClose, roomId }: Props) {
           </Button>
         </DialogActions>
       )}
-      
+
       {generatedLink && !generating && (
-         <DialogActions>
-         <Button onClick={handleClose}>Close</Button>
-       </DialogActions>
+        <DialogActions>
+          <Button onClick={handleClose}>Close</Button>
+        </DialogActions>
       )}
     </Dialog>
   );

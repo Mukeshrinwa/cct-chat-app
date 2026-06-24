@@ -396,6 +396,27 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
     }
   };
 
+  const handleDownloadMedia = useCallback(async () => {
+    const url = imageUrl || audioUrl || message.attachments?.[0]?.preview || message.attachments?.[0]?.path || message.attachments?.[0]?.url;
+    const name = message.attachments?.[0]?.name || 'download';
+    if (!url) return;
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = blobUrl;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error('Download failed', error);
+      window.open(url, '_blank');
+    }
+  }, [imageUrl, audioUrl, message.attachments]);
+
   let tickIcon = 'eva:checkmark-fill';
   let tickColor = 'text.disabled';
 
@@ -656,7 +677,26 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
                   spacing={1.5}
                   direction="row"
                   alignItems="center"
-                  onClick={() => window.open(att.preview || att.path, '_blank')}
+                  onClick={async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const url = att.preview || att.path || att.url;
+                    if (!url) return;
+                    try {
+                      const response = await fetch(url);
+                      const blob = await response.blob();
+                      const blobUrl = window.URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.style.display = 'none';
+                      a.href = blobUrl;
+                      a.download = att.name || 'download';
+                      document.body.appendChild(a);
+                      a.click();
+                      window.URL.revokeObjectURL(blobUrl);
+                    } catch {
+                      window.open(url, '_blank');
+                    }
+                  }}
                   sx={{
                     p: 1,
                     borderRadius: 1,
@@ -779,6 +819,12 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
       <IconButton size="small" onClick={() => setForwardDialogOpen(true)}>
         <Iconify icon="solar:share-bold" width={16} />
       </IconButton>
+
+      {(hasImage || isAudio || (message.attachments && message.attachments.length > 0)) && (
+        <IconButton size="small" onClick={handleDownloadMedia}>
+          <Iconify icon="solar:download-minimalistic-bold" width={16} />
+        </IconButton>
+      )}
 
       <IconButton size="small" onClick={handleOpenReactions}>
         <Iconify icon="eva:smiling-face-fill" width={16} />

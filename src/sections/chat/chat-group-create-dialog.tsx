@@ -111,8 +111,8 @@ export function ChatGroupCreateDialog({ open, onClose, chatContacts, preSelected
       toast.error('Group name is required');
       return;
     }
-    if (selectedIds.length === 0) {
-      toast.error('Please select at least one participant');
+    if (selectedIds.length < 2) {
+      toast.error('Please select at least two participants');
       return;
     }
 
@@ -358,7 +358,7 @@ export function ChatGroupCreateDialog({ open, onClose, chatContacts, preSelected
           color="primary"
           onClick={handleCreate}
           loading={submitting}
-          disabled={!groupName.trim() || selectedIds.length === 0}
+          disabled={!groupName.trim() || selectedIds.length < 2}
         >
           Create {selectedIds.length > 0 && `(${selectedIds.length})`}
         </LoadingButton>

@@ -278,7 +278,18 @@ export function ChatNav({
         {conversations.allIds
           .filter((conversationId) => {
             const isIncluded = archivedIds.includes(conversationId);
-            return showArchived ? isIncluded : !isIncluded;
+            const matchesArchive = showArchived ? isIncluded : !isIncluded;
+            if (!matchesArchive) return false;
+
+            const conv = conversations.byId[conversationId];
+            if (!conv) return false;
+
+            const isGroup = conv.type === 'GROUP' || conv.type === 'group';
+            if (!isGroup && (!conv.messages || conv.messages.length === 0)) {
+              return false;
+            }
+
+            return true;
           })
           .sort((a, b) => {
             const convA = conversations.byId[a];

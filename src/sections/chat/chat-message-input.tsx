@@ -620,7 +620,7 @@ export function ChatMessageInput({
           return;
         }
 
-        const audioFile = new File([audioBlob], `voice_${Date.now()}.webm`, { type: 'audio/webm' });
+        const audioFile = new File([audioBlob], `voice_${Date.now()}.mp3`, { type: 'audio/mp3' });
         const formData = new FormData();
         formData.append('file', audioFile);
         formData.append('conversationId', selectedConversationId);

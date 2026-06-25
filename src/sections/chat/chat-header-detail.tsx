@@ -309,8 +309,8 @@ export function ChatHeaderDetail({
           sx={{ width: 40, height: 40, cursor: 'pointer', '&:hover': { opacity: 0.85 } }}
         />
       ) : (
-        <AvatarGroup 
-          max={3} 
+        <AvatarGroup
+          max={3}
           onClick={handleAvatarClick}
           sx={{ cursor: 'pointer', [`& .${avatarGroupClasses.avatar}`]: { width: 32, height: 32 } }}
         >
@@ -458,9 +458,9 @@ export function ChatHeaderDetail({
           </MenuItem>
 
           <MenuItem onClick={handlePin}>
-            <Iconify 
-              icon="solar:pin-bold" 
-              sx={isPinned ? { transform: 'rotate(0deg)', color: 'primary.main' } : { transform: 'rotate(45deg)' }} 
+            <Iconify
+              icon="solar:pin-bold"
+              sx={isPinned ? { transform: 'rotate(0deg)', color: 'primary.main' } : { transform: 'rotate(45deg)' }}
             />
             {isPinned ? 'Unpin' : 'Pin'}
           </MenuItem>

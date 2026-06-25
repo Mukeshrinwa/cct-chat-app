@@ -235,13 +235,7 @@ async function fetchConversationDetail(conversationId: string, currentUser: any)
     if (checkRes.data && checkRes.data.exists) {
       ({ conversationId: realConvId, otherUser, conversation: conversationData } = checkRes.data);
 
-      // Update URL to the real conversation ID
-      if (realConvId && realConvId !== conversationId) {
-        const url = new URL(window.location.href);
-        url.searchParams.set('id', realConvId);
-        window.history.replaceState({}, '', url.pathname + url.search);
-        window.dispatchEvent(new Event('popstate'));
-      }
+
     } else if (checkRes.data && !checkRes.data.exists) {
       ({ otherUser } = checkRes.data);
     }
@@ -282,8 +276,14 @@ async function fetchConversationDetail(conversationId: string, currentUser: any)
     const urlParams = new URLSearchParams(window.location.search);
     const targetMsgId = urlParams.get('messageId');
     if (targetMsgId) {
-      const msgRes = await axios.get(`/api/v1/chats/messages/${realConvId}/context/${targetMsgId}`);
-      messages = msgRes.data?.data || [];
+      try {
+        const msgRes = await axios.get(`/api/v1/chats/messages/${realConvId}/context/${targetMsgId}`);
+        messages = msgRes.data?.data || [];
+      } catch (err) {
+        console.warn('Failed to fetch message context, falling back to regular messages', err);
+        const msgRes = await axios.get(`/api/v1/chats/messages/${realConvId}`);
+        messages = msgRes.data?.data || [];
+      }
     } else {
       const msgRes = await axios.get(`/api/v1/chats/messages/${realConvId}`);
       messages = msgRes.data?.data || [];
@@ -543,13 +543,7 @@ export async function sendMessage(conversationId: string, messageData: IChatMess
       });
       realConvId = createRes.data?.conversationId || createRes.data?.conversation?._id;
 
-      // Update URL to the new conversation ID
-      if (realConvId) {
-        const url = new URL(window.location.href);
-        url.searchParams.set('id', realConvId);
-        window.history.replaceState({}, '', url.pathname + url.search);
-        window.dispatchEvent(new Event('popstate'));
-      }
+
     }
   } catch (error) {
     console.error('Check conversation error in sendMessage:', error);
@@ -599,10 +593,10 @@ export async function sendMessage(conversationId: string, messageData: IChatMess
     };
   };
 
-  mutate('/api/v1/chats/conversations', updateConversationListCache, { revalidate: false });
-  mutate(`/api/v1/chats/conversations/${conversationId}`, updateConversationCache, { revalidate: false });
+  mutate('/api/v1/chats/conversations', updateConversationListCache, { revalidate: true });
+  mutate(`/api/v1/chats/conversations/${conversationId}`, updateConversationCache, { revalidate: true });
   if (realConvId !== conversationId) {
-    mutate(`/api/v1/chats/conversations/${realConvId}`, updateConversationCache, { revalidate: false });
+    mutate(`/api/v1/chats/conversations/${realConvId}`, updateConversationCache, { revalidate: true });
   }
 
   let socketSent = false;

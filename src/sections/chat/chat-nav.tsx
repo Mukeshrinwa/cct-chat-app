@@ -276,7 +276,7 @@ export function ChatNav({
   const renderLoading = <ChatNavItemSkeleton />;
 
   const filteredConversations = useMemo(() => conversations.allIds
-      .filter((conversationId) => {
+    .filter((conversationId) => {
       const isIncluded = archivedIds.includes(conversationId);
       const matchesArchive = showArchived ? isIncluded : !isIncluded;
       if (!matchesArchive) return false;

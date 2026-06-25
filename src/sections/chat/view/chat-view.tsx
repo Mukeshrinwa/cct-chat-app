@@ -1,4 +1,4 @@
-import type { IChatMessage, IChatParticipant } from 'src/types/chat';
+import type { IChatParticipant } from 'src/types/chat';
 
 import { mutate } from 'swr';
 import { useMemo, useState, useEffect, useCallback } from 'react';
@@ -8,7 +8,6 @@ import Stack from '@mui/material/Stack';
 import Avatar from '@mui/material/Avatar';
 import Typography from '@mui/material/Typography';
 import ListItemButton from '@mui/material/ListItemButton';
-import CircularProgress from '@mui/material/CircularProgress';
 
 import { paths } from 'src/routes/paths';
 import { useRouter, useSearchParams } from 'src/routes/hooks';
@@ -26,8 +25,7 @@ import {
   getMessageContext,
   useGetConversation,
   createConversation,
-  useGetConversations,
-  searchConversationMessages
+  useGetConversations
 } from 'src/actions/chat';
 
 import { EmptyContent } from 'src/components/empty-content';
@@ -78,34 +76,12 @@ export function ChatView() {
   const [recipients, setRecipients] = useState<IChatParticipant[]>([]);
 
   const [searchMessageQuery, setSearchMessageQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<IChatMessage[]>([]);
-  const [searchLoading, setSearchLoading] = useState(false);
 
-  useEffect(() => {
-    if (!searchMessageQuery.trim() || !selectedConversationId) {
-      setSearchResults([]);
-      return () => { };
-    }
-
-    const delayDebounce = setTimeout(async () => {
-      setSearchLoading(true);
-      try {
-        const results = await searchConversationMessages(selectedConversationId, searchMessageQuery);
-        setSearchResults(results);
-      } catch (err) {
-        console.error('Failed to search conversation messages:', err);
-      } finally {
-        setSearchLoading(false);
-      }
-    }, 400);
-
-    return () => clearTimeout(delayDebounce);
-  }, [searchMessageQuery, selectedConversationId]);
 
   const handleSelectSearchedMessage = useCallback(
     async (msgId: string) => {
       setSearchMessageQuery('');
-      router.push(`${paths.dashboard.chat}?id=${selectedConversationId}&messageId=${msgId}`);
+      router.replace(`${paths.dashboard.chat}?id=${selectedConversationId}&messageId=${msgId}`);
       try {
         const contextMessages = await getMessageContext(selectedConversationId, msgId);
         if (contextMessages && contextMessages.length > 0) {
@@ -201,7 +177,7 @@ export function ChatView() {
   useEffect(() => {
     setActiveConversation(selectedConversationId || null);
     setSearchMessageQuery('');
-    
+
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible' && selectedConversationId) {
         clickConversation(selectedConversationId);
@@ -215,7 +191,7 @@ export function ChatView() {
       document.addEventListener('visibilitychange', handleVisibilityChange);
       window.addEventListener('focus', handleVisibilityChange);
     }
-    
+
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', handleVisibilityChange);
@@ -280,19 +256,15 @@ export function ChatView() {
   const renderSearchConversationResults = (
     <Stack sx={{ flex: '1 1 auto', bgcolor: 'background.paper', p: 3, overflowY: 'auto' }}>
       <Typography variant="subtitle1" sx={{ mb: 2, color: 'text.secondary' }}>
-        Search results for &ldquo;{searchMessageQuery}&rdquo; ({searchResults.length})
+        Search results for &ldquo;{searchMessageQuery}&rdquo; ({filteredMessages.length})
       </Typography>
-      {searchLoading ? (
-        <Stack alignItems="center" justifyContent="center" sx={{ py: 8 }}>
-          <CircularProgress size={32} color="inherit" />
-        </Stack>
-      ) : searchResults.length === 0 ? (
+      {filteredMessages.length === 0 ? (
         <Typography variant="body2" sx={{ color: 'text.disabled', textAlign: 'center', py: 8 }}>
           No messages found
         </Typography>
       ) : (
         <Stack spacing={1.5}>
-          {searchResults.map((msg) => {
+          {filteredMessages.map((msg) => {
             const sender: any = participants.find((p) => p.id === msg.senderId) || (msg.senderId === user?.id ? user : null);
             const senderName = msg.senderId === user?.id ? 'You' : (sender?.name || sender?.displayName || 'User');
             const senderAvatar = msg.senderId === user?.id ? (user?.photoURL || (user as any)?.avatarUrl) : (sender?.avatarUrl || sender?.photoURL || '');

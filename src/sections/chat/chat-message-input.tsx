@@ -134,7 +134,7 @@ export function ChatMessageInput({
 
   const isBlockedByOther = useMemo(() => {
     if (!selectedConversationId || !rawConversationEntry || rawConversationEntry.type !== 'direct') return false;
-    const {otherUser} = rawConversationEntry;
+    const { otherUser } = rawConversationEntry;
     if (!otherUser || !currentUser) return false;
     const currentUserIdStr = (currentUser.id || currentUser._id || '').toString();
     return (otherUser.blockedUsers || []).some((id: any) => id.toString() === currentUserIdStr);
@@ -173,7 +173,7 @@ export function ChatMessageInput({
       toggleBlockUser(rId, false);
       toast.success(`Unblocked ${recipient.name || 'user'}`);
       setUnblockDialogOpen(false);
-      
+
       // Execute the pending action if any
       if (pendingActionRef.current) {
         const action = pendingActionRef.current;
@@ -500,10 +500,10 @@ export function ChatMessageInput({
           formData.append('file', pendingFile);
           formData.append('conversationId', selectedConversationId);
           formData.append('messageId', uuidv4());
-          
+
           formData.append('text', message);
           formData.append('body', message);
-          
+
           if (replyingToMessage) {
             const pId = replyingToMessage._id || replyingToMessage.id || replyingToMessage.messageId;
             formData.append('parentMessageId', pId);
@@ -514,7 +514,7 @@ export function ChatMessageInput({
             headers: { 'Content-Type': 'multipart/form-data' },
           });
           console.log('[FILE_UPLOAD_INLINE_WITH_CAPTION] File uploaded via FormData');
-          
+
           setPendingFile(null);
           if (pendingFilePreview) {
             URL.revokeObjectURL(pendingFilePreview);
@@ -523,7 +523,7 @@ export function ChatMessageInput({
           setPendingFileType(null);
           setMessage('');
           setReplyingToMessage(null);
-          
+
           mutate(`/api/v1/chats/conversations/${selectedConversationId}`);
           mutate('/api/v1/chats/conversations');
         } catch (error) {
@@ -625,7 +625,7 @@ export function ChatMessageInput({
         formData.append('file', audioFile);
         formData.append('conversationId', selectedConversationId);
         formData.append('messageId', uuidv4());
-        
+
         if (replyingToMessage) {
           const pId = replyingToMessage._id || replyingToMessage.id || replyingToMessage.messageId;
           formData.append('parentMessageId', pId);
@@ -909,13 +909,13 @@ export function ChatMessageInput({
           }}
         >
           <Stack direction="row" alignItems="center" spacing={1}>
-            <Iconify 
-              icon={!isUserMember ? "solar:info-circle-bold" : "solar:forbidden-circle-bold"} 
-              sx={{ color: 'text.secondary', flexShrink: 0 }} 
+            <Iconify
+              icon={!isUserMember ? "solar:info-circle-bold" : "solar:forbidden-circle-bold"}
+              sx={{ color: 'text.secondary', flexShrink: 0 }}
             />
             <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 500 }}>
-              {!isUserMember 
-                ? "You can't send messages to this group because you're no longer a participant." 
+              {!isUserMember
+                ? "You can't send messages to this group because you're no longer a participant."
                 : "You cannot send messages to this contact because they blocked you."}
             </Typography>
           </Stack>

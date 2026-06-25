@@ -1,6 +1,6 @@
 import type { IChatMessage, IChatParticipant } from 'src/types/chat';
 
-import { useMemo, useEffect } from 'react';
+import { useRef, useMemo, useEffect } from 'react';
 
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
@@ -44,10 +44,10 @@ function getMessageImageUrl(message: IChatMessage): string | null {
 }
 
 export function ChatMessageList({ messages = [], participants, loading }: Props) {
-  const { messagesEndRef } = useMessagesScroll(messages);
-
   const searchParams = useSearchParams();
   const targetMessageId = searchParams.get('messageId') || '';
+
+  const { messagesEndRef } = useMessagesScroll(messages, targetMessageId);
 
   const slides = useMemo(() => {
     const list: { src: string }[] = [];
@@ -62,16 +62,28 @@ export function ChatMessageList({ messages = [], participants, loading }: Props)
 
   const lightbox = useLightBox(slides);
 
+  const hasScrolledToMessage = useRef<string | null>(null);
+
   useEffect(() => {
     if (targetMessageId && !loading) {
+      if (hasScrolledToMessage.current === targetMessageId) {
+        return undefined;
+      }
+
       const timer = setTimeout(() => {
         const element = document.getElementById(`msg-${targetMessageId}`);
         if (element) {
           element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          hasScrolledToMessage.current = targetMessageId;
         }
       }, 300);
       return () => clearTimeout(timer);
     }
+
+    if (!targetMessageId) {
+      hasScrolledToMessage.current = null;
+    }
+
     return undefined;
   }, [targetMessageId, messages, loading]);
 

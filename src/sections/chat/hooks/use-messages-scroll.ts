@@ -8,10 +8,13 @@ export type UseMessagesScrollReturn = {
   messagesEndRef: React.RefObject<HTMLDivElement>;
 };
 
-export function useMessagesScroll(messages: IChatMessage[]): UseMessagesScrollReturn {
+export function useMessagesScroll(messages: IChatMessage[], targetMessageId?: string): UseMessagesScrollReturn {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = useCallback(() => {
+    if (targetMessageId) {
+      return;
+    }
     if (!messages) {
       return;
     }
@@ -23,7 +26,7 @@ export function useMessagesScroll(messages: IChatMessage[]): UseMessagesScrollRe
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollTop = messagesEndRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [messages, targetMessageId]);
 
   useEffect(
     () => {

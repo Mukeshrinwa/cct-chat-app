@@ -5,11 +5,17 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 
+import Link from '@mui/material/Link';
 import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
+import Dialog from '@mui/material/Dialog';
+import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 import LoadingButton from '@mui/lab/LoadingButton';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
 import InputAdornment from '@mui/material/InputAdornment';
 
 import { useRouter } from 'src/routes/hooks';
@@ -46,6 +52,7 @@ export function JwtSignInView() {
   const { checkUserSession } = useAuthContext();
 
   const [errorMsg, setErrorMsg] = useState('');
+  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
 
   const password = useBoolean();
 
@@ -122,6 +129,16 @@ export function JwtSignInView() {
             ),
           }}
         />
+
+        <Link
+          variant="body2"
+          color="inherit"
+          underline="always"
+          sx={{ alignSelf: 'flex-end', cursor: 'pointer' }}
+          onClick={() => setForgotPasswordOpen(true)}
+        >
+          Forgot password?
+        </Link>
       </Stack>
 
       <LoadingButton
@@ -151,6 +168,18 @@ export function JwtSignInView() {
       <Form methods={methods} onSubmit={onSubmit}>
         {renderForm}
       </Form>
+
+      <Dialog open={forgotPasswordOpen} onClose={() => setForgotPasswordOpen(false)}>
+        <DialogTitle sx={{ pb: 2 }}>Forgot Password?</DialogTitle>
+        <DialogContent sx={{ color: 'text.secondary', typography: 'body2' }}>
+          Please contact the admin to update your password.
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setForgotPasswordOpen(false)} color="inherit">
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 }

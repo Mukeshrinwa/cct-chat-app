@@ -27,6 +27,7 @@ import { useRouter, useSearchParams } from 'src/routes/hooks';
 
 import { useBoolean } from 'src/hooks/use-boolean';
 
+import { useSocket } from 'src/socket';
 import { searchUsers } from 'src/api/user';
 import { useGroupStore } from 'src/store/useGroupStore';
 import { socketManager } from 'src/socket/socket-service';
@@ -63,6 +64,7 @@ export function ChatRoomGroup({ participants, isUserMember = true }: Props) {
   const searchParams = useSearchParams();
   const selectedConversationId = searchParams.get('id') || '';
   const { user } = useMockedUser();
+  const { onlineUsers } = useSocket();
 
   const { groups } = useGetGroups();
   const groupStoreGroups = useGroupStore((state) => state.groups);
@@ -508,12 +510,14 @@ export function ChatRoomGroup({ participants, isUserMember = true }: Props) {
       {groupParticipants.map((participant) => {
         const isOwner = !!ownerId && participant.id === ownerId;
         const isAdmin = !isOwner && adminIds.has(participant.id);
+        const isRealtimeOnline = onlineUsers.has(participant.id);
+        const actualStatus = isRealtimeOnline ? 'online' : (participant.status || 'offline');
 
         return (
           <Box key={participant.id} sx={{ display: 'flex', alignItems: 'center' }}>
             <ListItemButton sx={{ flexGrow: 1, minWidth: 0 }} onClick={() => handleOpen(participant)}>
               <Badge
-                variant={participant.status}
+                variant={actualStatus as any}
                 anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
               >
                 <Avatar alt={participant.name} src={participant.avatarUrl} />

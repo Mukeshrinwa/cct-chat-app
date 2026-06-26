@@ -142,7 +142,7 @@ export function InviteModal({ open, onClose, roomId }: Props) {
         {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
 
         {!generatedLink && !generating && (
-          <Stack spacing={3}>
+          <Stack spacing={3} mt={2}>
             <TextField
               select
               fullWidth

@@ -116,7 +116,7 @@ export function SocketProvider({ children }: SocketProviderProps) {
 
     const onConnect = () => {
       setIsConnected(true);
-      console.log(`[SOCKET_CONNECTED] Socket ID: ${socketInstance.id} | TS: ${Date.now()}`);
+      // console.log(`[SOCKET_CONNECTED] Socket ID: ${socketInstance.id} | TS: ${Date.now()}`);
     };
 
     // 🔍 DEBUG: log ALL incoming socket events to find exact event names

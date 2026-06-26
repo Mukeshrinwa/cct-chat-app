@@ -175,6 +175,22 @@ export function ChatView() {
   }, [conversation, user?.id, groups, groupsLoading, selectedConversationId]);
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const navEntries = window.performance?.getEntriesByType('navigation') || [];
+      const isReload = navEntries.length > 0 && (navEntries[0] as PerformanceNavigationTiming).type === 'reload';
+      
+      if (isReload && !(window as any)._chatReloadHandled) {
+        (window as any)._chatReloadHandled = true;
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('id')) {
+          router.replace(paths.dashboard.chat);
+        }
+      }
+    }
+  }, [router]);
+
+  useEffect(() => {
     setActiveConversation(selectedConversationId || null);
     setSearchMessageQuery('');
 

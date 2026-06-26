@@ -289,6 +289,22 @@ export function ChatHeaderDetail({
     ? (typingUserNames.length === 1 ? `${typingUserNames[0]} is typing...` : 'Multiple people are typing...')
     : null;
 
+  let memberCount = participants.length + (isUserMember ? 1 : 0);
+  if (group && currentGroup) {
+    const seen = new Set<string>();
+    (currentGroup.admins || []).forEach((u: any) => {
+      const id = u.id || u._id || '';
+      if (id) seen.add(id);
+    });
+    (currentGroup.members || []).forEach((u: any) => {
+      const id = u.id || u._id || '';
+      if (id) seen.add(id);
+    });
+    if (seen.size > 0) {
+      memberCount = seen.size;
+    }
+  }
+
   const renderGroup = (
     <Stack
       direction="row"
@@ -331,7 +347,7 @@ export function ChatHeaderDetail({
           groupTypingText ? (
             <span style={{ color: '#00a884', fontWeight: 600 }}>{groupTypingText}</span>
           ) : (
-            `${participants.length + (isUserMember ? 1 : 0)} members`
+            `${memberCount} members`
           )
         }
         secondaryTypographyProps={{

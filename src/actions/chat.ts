@@ -496,7 +496,6 @@ export function useGetConversation(conversationId: string) {
     swrOptions
   );
 
-  console.log('[DEBUG] useGetConversation SWR state for ID:', conversationId, { data, isLoading, error, isValidating });
 
   const memoizedValue = useMemo(
     () => ({

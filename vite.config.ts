@@ -47,12 +47,9 @@ export default defineConfig(({ mode }) => {
     target: 'esnext',
     rollupOptions: {
       output: {
-        manualChunks: (id) => {
-          if (id.includes('node_modules')) {
-            if (id.includes('@mui')) return 'vendor_mui';
-            if (id.includes('react')) return 'vendor_react';
-            return 'vendor';
-          }
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'react-router-dom'],
+          mui: ['@mui/material', '@mui/lab'],
         },
       },
     },

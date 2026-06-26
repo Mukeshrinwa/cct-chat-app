@@ -39,8 +39,8 @@ export type ConfigValue = {
 export const CONFIG: ConfigValue = {
   site: {
     name: 'Minimals',
-    serverUrl: (import.meta.env.VITE_SERVER_URL || 'http://server.peoplchat.com').replace(/\/$/, ''),
-    assetURL: (import.meta.env.VITE_ASSET_URL || 'http://server.peoplchat.com').replace(/\/$/, ''),
+    serverUrl: (import.meta.env.VITE_SERVER_URL || 'https://server.peoplchat.com').replace(/\/$/, ''),
+    assetURL: (import.meta.env.VITE_ASSET_URL || 'https://server.peoplchat.com').replace(/\/$/, ''),
     basePath: import.meta.env.VITE_BASE_PATH ?? '',
     version: packageJson.version,
   },

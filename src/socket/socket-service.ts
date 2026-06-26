@@ -7,9 +7,11 @@ import { io } from 'socket.io-client';
 // Backend is always on production server (not local)
 // ----------------------------------------------------------------------
 
-export const BASE_URL = 'https://chatserrver.pmitadmin.in/api/v1';
+import { CONFIG } from 'src/config-global';
 
-export const SOCKET_URL_BASE = 'https://chatserrver.pmitadmin.in';
+export const BASE_URL = `${CONFIG.site.serverUrl}/api/v1`;
+
+export const SOCKET_URL_BASE = CONFIG.site.serverUrl;
 
 // ----------------------------------------------------------------------
 // SocketManager - Singleton Pattern

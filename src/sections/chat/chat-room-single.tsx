@@ -246,7 +246,7 @@ export function ChatRoomSingle({ participant }: Props) {
       color: 'success.main',
       bgColor: 'success.soft',
       onClick: handleAudioCall,
-      disabled: isMe,
+      disabled: true,
     },
     {
       key: 'video',
@@ -255,7 +255,7 @@ export function ChatRoomSingle({ participant }: Props) {
       color: 'info.main',
       bgColor: 'info.soft',
       onClick: handleVideoCall,
-      disabled: isMe,
+      disabled: true,
     },
     {
       key: 'new-group',

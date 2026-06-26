@@ -80,8 +80,16 @@ export function ChatGroupEditDialog({ open, onClose, group }: Props) {
   const [groupAvatar, setGroupAvatar] = useState('');
 
   // ── Permissions ────────────────────────────────────────────────────
-  const [onlyAdminsCanMessage, setOnlyAdminsCanMessage] = useState(false);
-  const [onlyAdminsCanEditInfo, setOnlyAdminsCanEditInfo] = useState(false);
+  const [permissions, setPermissions] = useState({
+    onlyAdminsCanMessage: false,
+    onlyAdminsCanEditInfo: false,
+    editGroupInfo: 'all',
+    addMembers: 'all',
+    removeMembers: 'admins',
+    startCalls: 'all',
+    manageMessages: 'admins',
+    disappearingMessages: 'all',
+  });
 
   // ── Disappearing messages ──────────────────────────────────────────
   const [disappearingMode, setDisappearingMode] = useState('off');
@@ -147,8 +155,16 @@ export function ChatGroupEditDialog({ open, onClose, group }: Props) {
       setDescription(group.description || '');
       setGroupAvatar(group.groupAvatar || '');
       setGroupAvatarPreview(group.groupAvatar || '');
-      setOnlyAdminsCanMessage(group.permissions?.onlyAdminsCanMessage ?? false);
-      setOnlyAdminsCanEditInfo(group.permissions?.onlyAdminsCanEditInfo ?? false);
+      setPermissions({
+        onlyAdminsCanMessage: group.permissions?.onlyAdminsCanMessage ?? false,
+        onlyAdminsCanEditInfo: group.permissions?.onlyAdminsCanEditInfo ?? false,
+        editGroupInfo: group.permissions?.editGroupInfo || 'all',
+        addMembers: group.permissions?.addMembers || 'all',
+        removeMembers: group.permissions?.removeMembers || 'admins',
+        startCalls: group.permissions?.startCalls || 'all',
+        manageMessages: group.permissions?.manageMessages || 'admins',
+        disappearingMessages: group.permissions?.disappearingMessages || 'all',
+      });
       // Always sync disappearingMode from the group — after a successful save
       // the optimistic SWR patch in updateDisappearingMessages ensures group.disappearingMode
       // already reflects the new value, so this is always correct.
@@ -178,7 +194,7 @@ export function ChatGroupEditDialog({ open, onClose, group }: Props) {
         groupName,
         description,
         groupAvatar,
-        permissions: { onlyAdminsCanMessage, onlyAdminsCanEditInfo },
+        permissions,
       });
       toast.success('Group settings updated');
       onClose();
@@ -427,63 +443,57 @@ export function ChatGroupEditDialog({ open, onClose, group }: Props) {
     </Stack>
   );
 
+  const PERM_CONFIG = [
+    { key: 'onlyAdminsCanMessage', type: 'boolean', label: 'Send Messages', descOn: 'Regular members cannot send messages', descOff: 'All members can send messages', icon: 'solar:chat-round-bold', color: 'primary' },
+    { key: 'onlyAdminsCanEditInfo', type: 'boolean', label: 'Edit Group Info (Legacy)', descOn: 'Group name, avatar locked to admins', descOff: 'All members can edit group info', icon: 'solar:pen-new-square-bold', color: 'warning' },
+    { key: 'editGroupInfo', type: 'string', label: 'Edit Group Info', descOn: 'Only admins can edit info', descOff: 'All members can edit info', icon: 'solar:pen-new-square-bold', color: 'warning' },
+    { key: 'addMembers', type: 'string', label: 'Add Members', descOn: 'Only admins can add members', descOff: 'All members can add members', icon: 'solar:user-plus-bold', color: 'primary' },
+    { key: 'removeMembers', type: 'string', label: 'Remove Members', descOn: 'Only admins can remove members', descOff: 'All members can remove members', icon: 'solar:user-minus-bold', color: 'error' },
+    { key: 'startCalls', type: 'string', label: 'Start Calls', descOn: 'Only admins can start calls', descOff: 'All members can start calls', icon: 'solar:phone-bold', color: 'success' },
+    { key: 'manageMessages', type: 'string', label: 'Manage Messages', descOn: 'Only admins can manage messages', descOff: 'All members can manage messages', icon: 'solar:chat-round-dots-bold', color: 'info' },
+    { key: 'disappearingMessages', type: 'string', label: 'Disappearing Messages', descOn: 'Only admins can change disappearing settings', descOff: 'All members can change disappearing settings', icon: 'solar:clock-circle-bold', color: 'secondary' },
+  ] as const;
+
   const renderPermissionsTab = (
     <Stack spacing={2}>
-      {/* Messaging permission */}
-      <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'background.neutral' }}>
-        <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 1 }}>
-          <Iconify icon="solar:chat-round-bold" width={20} sx={{ color: 'primary.main' }} />
-          <Typography variant="subtitle2">Send Messages</Typography>
-        </Stack>
-        <FormControlLabel
-          control={
-            <Switch
-              checked={onlyAdminsCanMessage}
-              onChange={(e) => setOnlyAdminsCanMessage(e.target.checked)}
-              color="primary"
-            />
-          }
-          label={
-            <Stack>
-              <Typography variant="body2">Only admins &amp; owner can send messages</Typography>
-              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                {onlyAdminsCanMessage
-                  ? 'Regular members cannot send messages'
-                  : 'All members can send messages'}
-              </Typography>
-            </Stack>
-          }
-          sx={{ mx: 0, width: '100%', justifyContent: 'space-between', flexDirection: 'row-reverse' }}
-        />
-      </Box>
+      {PERM_CONFIG.map((conf) => {
+        const val = permissions[conf.key as keyof typeof permissions];
+        const isChecked = conf.type === 'boolean' ? val === true : val === 'admins';
 
-      {/* Group info permission */}
-      <Box sx={{ p: 2, borderRadius: 2, bgcolor: 'background.neutral' }}>
-        <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 1 }}>
-          <Iconify icon="solar:pen-new-square-bold" width={20} sx={{ color: 'warning.main' }} />
-          <Typography variant="subtitle2">Edit Group Info</Typography>
-        </Stack>
-        <FormControlLabel
-          control={
-            <Switch
-              checked={onlyAdminsCanEditInfo}
-              onChange={(e) => setOnlyAdminsCanEditInfo(e.target.checked)}
-              color="warning"
-            />
-          }
-          label={
-            <Stack>
-              <Typography variant="body2">Only admins &amp; owner can edit group info</Typography>
-              <Typography variant="caption" sx={{ color: 'text.secondary' }}>
-                {onlyAdminsCanEditInfo
-                  ? 'Group name, avatar & description locked to admins'
-                  : 'All members can edit group info'}
-              </Typography>
+        return (
+          <Box key={conf.key} sx={{ p: 2, borderRadius: 2, bgcolor: 'background.neutral' }}>
+            <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 1 }}>
+              <Iconify icon={conf.icon} width={20} sx={{ color: `${conf.color}.main` }} />
+              <Typography variant="subtitle2">{conf.label}</Typography>
             </Stack>
-          }
-          sx={{ mx: 0, width: '100%', justifyContent: 'space-between', flexDirection: 'row-reverse' }}
-        />
-      </Box>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={isChecked}
+                  onChange={(e) => {
+                    const {checked} = e.target;
+                    const newValue = conf.type === 'boolean' ? checked : (checked ? 'admins' : 'all');
+                    setPermissions((prev) => ({
+                      ...prev,
+                      [conf.key]: newValue,
+                    }));
+                  }}
+                  color={conf.color as any}
+                />
+              }
+              label={
+                <Stack>
+                  <Typography variant="body2">Only admins &amp; owner</Typography>
+                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                    {isChecked ? conf.descOn : conf.descOff}
+                  </Typography>
+                </Stack>
+              }
+              sx={{ mx: 0, width: '100%', justifyContent: 'space-between', flexDirection: 'row-reverse' }}
+            />
+          </Box>
+        );
+      })}
     </Stack>
   );
 
@@ -767,10 +777,10 @@ export function ChatGroupEditDialog({ open, onClose, group }: Props) {
 
       <Divider />
 
-      {/* Footer — only show Save/Delete on General tab */}
-      {activeTab === 0 && (
+      {/* Footer — show Save/Delete on General and Permissions tabs */}
+      {(activeTab === 0 || activeTab === 1) && (
         <DialogActions sx={{ p: 2.5, display: 'flex', justifyContent: 'space-between' }}>
-          {isOwner ? (
+          {activeTab === 0 && isOwner ? (
             <Button
               variant="outlined"
               color="error"

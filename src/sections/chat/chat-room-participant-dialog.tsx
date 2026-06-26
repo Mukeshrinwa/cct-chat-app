@@ -103,7 +103,7 @@ export function ChatRoomParticipantDialog({ participant, open, onClose }: Props)
               size="small"
               color="error"
               onClick={handleAudioCall}
-              disabled={isMe}
+              disabled
               title="Start audio call"
               sx={{
                 borderRadius: 1,
@@ -154,7 +154,7 @@ export function ChatRoomParticipantDialog({ participant, open, onClose }: Props)
               size="small"
               color="secondary"
               onClick={handleVideoCall}
-              disabled={isMe}
+              disabled
               title="Start video call"
               sx={{
                 borderRadius: 1,

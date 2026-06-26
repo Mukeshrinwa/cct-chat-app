@@ -431,11 +431,11 @@ export function ChatHeaderDetail({
           }}
         />
 
-        <IconButton onClick={handleAudioCall} disabled={!isUserMember || isBlockedByOther} title="Start audio call">
+        <IconButton onClick={handleAudioCall} disabled title="Start audio call">
           <Iconify icon="solar:phone-bold" />
         </IconButton>
 
-        <IconButton onClick={handleVideoCall} disabled={!isUserMember || isBlockedByOther} title="Start video call">
+        <IconButton onClick={handleVideoCall} disabled title="Start video call">
           <Iconify icon="solar:videocamera-record-bold" />
         </IconButton>
         <IconButton

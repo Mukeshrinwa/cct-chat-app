@@ -43,5 +43,24 @@ export default defineConfig(({ mode }) => {
   },
   server: { port: PORT, host: true },
   preview: { port: PORT, host: true },
+  build: {
+    target: 'esnext',
+    rollupOptions: {
+      output: {
+        manualChunks: (id) => {
+          if (id.includes('node_modules')) {
+            if (id.includes('@mui')) return 'vendor_mui';
+            if (id.includes('react')) return 'vendor_react';
+            return 'vendor';
+          }
+        },
+      },
+    },
+  },
+  optimizeDeps: {
+    esbuildOptions: {
+      target: 'esnext',
+    },
+  },
   };
 });

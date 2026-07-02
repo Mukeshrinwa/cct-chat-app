@@ -226,6 +226,31 @@ export function ChatMessageInput({
     }
   }, [recipients, selectedConversationId]);
 
+  useEffect(() => {
+    const handleChatFileDrop = (e: any) => {
+      const {file} = e.detail;
+      if (!file || !selectedConversationId) return;
+
+      let type: 'image' | 'video' | 'document' = 'document';
+      if (file.type.startsWith('image/')) {
+        type = 'image';
+      } else if (file.type.startsWith('video/')) {
+        type = 'video';
+      }
+
+      setPendingFile(file);
+      setPendingFileType(type);
+      if (type === 'image' || type === 'video') {
+        setPendingFilePreview(URL.createObjectURL(file));
+      } else {
+        setPendingFilePreview('');
+      }
+    };
+
+    window.addEventListener('chat-file-drop', handleChatFileDrop);
+    return () => window.removeEventListener('chat-file-drop', handleChatFileDrop);
+  }, [selectedConversationId]);
+
   const [emojiAnchor, setEmojiAnchor] = useState<HTMLButtonElement | null>(null);
 
   const handleOpenEmoji = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
@@ -711,8 +736,35 @@ export function ChatMessageInput({
     setReplyingToMessage(null);
   }, [setReplyingToMessage]);
 
+  const handleDrop = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const file = event.dataTransfer.files?.[0];
+    if (!file || !selectedConversationId) return;
+
+    let type: 'image' | 'video' | 'document' = 'document';
+    if (file.type.startsWith('image/')) {
+      type = 'image';
+    } else if (file.type.startsWith('video/')) {
+      type = 'video';
+    }
+
+    setPendingFile(file);
+    setPendingFileType(type);
+    if (type === 'image' || type === 'video') {
+      setPendingFilePreview(URL.createObjectURL(file));
+    } else {
+      setPendingFilePreview('');
+    }
+  }, [selectedConversationId]);
+
+  const handleDragOver = useCallback((event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+  }, []);
+
   return (
-    <Stack sx={{ position: 'relative' }}>
+    <Stack sx={{ position: 'relative' }} onDragOver={handleDragOver} onDrop={handleDrop}>
       {/* Block Warning Banner (WhatsApp style) */}
       {isBlocked && (
         <Stack
@@ -894,7 +946,7 @@ export function ChatMessageInput({
         </Stack>
       )}
 
-      {(!isUserMember || isBlockedByOther) ? (
+      {(!isUserMember || isBlockedByOther ) ? (
         <Stack
           alignItems="center"
           justifyContent="center"

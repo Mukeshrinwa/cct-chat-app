@@ -178,7 +178,7 @@ function ScrollContent() {
       <StyledContainer style={{ background }} data-scrolling={startScroll}>
         <StyledContent ref={scrollRef} layout>
           <StyledItem
-            style={{ x: x1 }}
+            style={{ x: x1 as any }}
             sx={{
               height: { xs: 160, md: 180 },
               width: { xs: '600%', md: '400%' },
@@ -186,7 +186,7 @@ function ScrollContent() {
             }}
           />
           <StyledItem
-            style={{ x: x2 }}
+            style={{ x: x2 as any }}
             sx={{
               height: { xs: 400, md: 480 },
               width: { xs: '600%', md: '400%' },

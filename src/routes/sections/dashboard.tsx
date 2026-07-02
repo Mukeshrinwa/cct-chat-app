@@ -12,7 +12,8 @@ import { AuthGuard } from 'src/auth/guard';
 
 // App
 const ChatPage = lazy(() => import('src/pages/dashboard/chat'));
-
+const PrivacyPage = lazy(() => import('src/pages/dashboard/privacy'));
+const TermsPage = lazy(() => import('src/pages/dashboard/terms'));
 // Test render page by role
 // Blank page
 
@@ -28,12 +29,12 @@ const layoutContent = (
 
 export const dashboardRoutes = [
   {
-    path: 'dashboard',
+    path: '/',
     children: [
       {
         element: CONFIG.auth.skip ? <>{layoutContent}</> : <AuthGuard>{layoutContent}</AuthGuard>,
         children: [
-          { element: <Navigate to="/dashboard/chat" replace />, index: true },
+          { element: <Navigate to="/chat" replace />, index: true },
      
         ],
       },
@@ -50,6 +51,22 @@ export const dashboardRoutes = [
             </Suspense>
           </AuthGuard>
         ),
+      },
+      {
+        path: 'privacy-policy',
+        element: 
+            <Suspense fallback={<LoadingScreen />}>
+              <PrivacyPage />
+            </Suspense>
+         
+      },
+      {
+        path: 'termsandConditions',
+        element: 
+            <Suspense fallback={<LoadingScreen />}>
+              <TermsPage />
+            </Suspense>
+         
       },
     ],
   },

@@ -81,8 +81,8 @@ export function ChatGroupEditDialog({ open, onClose, group }: Props) {
 
   // ── Permissions ────────────────────────────────────────────────────
   const [permissions, setPermissions] = useState({
-    onlyAdminsCanMessage: false,
-    onlyAdminsCanEditInfo: false,
+    // onlyAdminsCanMessage: false,
+    // onlyAdminsCanEditInfo: false,
     editGroupInfo: 'all',
     addMembers: 'all',
     removeMembers: 'admins',
@@ -90,7 +90,9 @@ export function ChatGroupEditDialog({ open, onClose, group }: Props) {
     manageMessages: 'admins',
     disappearingMessages: 'all',
   });
-
+const [settings,setSettings] = useState({
+  isAnnouncementOnly: false
+})
   // ── Disappearing messages ──────────────────────────────────────────
   const [disappearingMode, setDisappearingMode] = useState('off');
 
@@ -156,14 +158,17 @@ export function ChatGroupEditDialog({ open, onClose, group }: Props) {
       setGroupAvatar(group.groupAvatar || '');
       setGroupAvatarPreview(group.groupAvatar || '');
       setPermissions({
-        onlyAdminsCanMessage: group.permissions?.onlyAdminsCanMessage ?? false,
-        onlyAdminsCanEditInfo: group.permissions?.onlyAdminsCanEditInfo ?? false,
+        // onlyAdminsCanMessage: group.permissions?.onlyAdminsCanMessage ?? false,
+        // onlyAdminsCanEditInfo: group.permissions?.onlyAdminsCanEditInfo ?? false,
         editGroupInfo: group.permissions?.editGroupInfo || 'all',
         addMembers: group.permissions?.addMembers || 'all',
         removeMembers: group.permissions?.removeMembers || 'admins',
         startCalls: group.permissions?.startCalls || 'all',
         manageMessages: group.permissions?.manageMessages || 'admins',
         disappearingMessages: group.permissions?.disappearingMessages || 'all',
+      });
+      setSettings({
+        isAnnouncementOnly: group.settings?.isAnnouncementOnly || false,
       });
       // Always sync disappearingMode from the group — after a successful save
       // the optimistic SWR patch in updateDisappearingMessages ensures group.disappearingMode
@@ -195,6 +200,7 @@ export function ChatGroupEditDialog({ open, onClose, group }: Props) {
         description,
         groupAvatar,
         permissions,
+        settings,
       });
       toast.success('Group settings updated');
       onClose();
@@ -444,8 +450,8 @@ export function ChatGroupEditDialog({ open, onClose, group }: Props) {
   );
 
   const PERM_CONFIG = [
-    { key: 'onlyAdminsCanMessage', type: 'boolean', label: 'Send Messages', descOn: 'Regular members cannot send messages', descOff: 'All members can send messages', icon: 'solar:chat-round-bold', color: 'primary' },
-    { key: 'onlyAdminsCanEditInfo', type: 'boolean', label: 'Edit Group Info (Legacy)', descOn: 'Group name, avatar locked to admins', descOff: 'All members can edit group info', icon: 'solar:pen-new-square-bold', color: 'warning' },
+    // { key: 'onlyAdminsCanMessage', type: 'boolean', label: 'Send Messages', descOn: 'Regular members cannot send messages', descOff: 'All members can send messages', icon: 'solar:chat-round-bold', color: 'primary' },
+    // { key: 'onlyAdminsCanEditInfo', type: 'boolean', label: 'Edit Group Info (Legacy)', descOn: 'Group name, avatar locked to admins', descOff: 'All members can edit group info', icon: 'solar:pen-new-square-bold', color: 'warning' },
     { key: 'editGroupInfo', type: 'string', label: 'Edit Group Info', descOn: 'Only admins can edit info', descOff: 'All members can edit info', icon: 'solar:pen-new-square-bold', color: 'warning' },
     { key: 'addMembers', type: 'string', label: 'Add Members', descOn: 'Only admins can add members', descOff: 'All members can add members', icon: 'solar:user-plus-bold', color: 'primary' },
     { key: 'removeMembers', type: 'string', label: 'Remove Members', descOn: 'Only admins can remove members', descOff: 'All members can remove members', icon: 'solar:user-minus-bold', color: 'error' },
@@ -457,8 +463,8 @@ export function ChatGroupEditDialog({ open, onClose, group }: Props) {
   const renderPermissionsTab = (
     <Stack spacing={2}>
       {PERM_CONFIG.map((conf) => {
-        const val = permissions[conf.key as keyof typeof permissions];
-        const isChecked = conf.type === 'boolean' ? val === true : val === 'admins';
+         const val = permissions[conf.key as keyof typeof permissions];
+       const isChecked = val === 'admins';
 
         return (
           <Box key={conf.key} sx={{ p: 2, borderRadius: 2, bgcolor: 'background.neutral' }}>
@@ -472,7 +478,7 @@ export function ChatGroupEditDialog({ open, onClose, group }: Props) {
                   checked={isChecked}
                   onChange={(e) => {
                     const {checked} = e.target;
-                    const newValue = conf.type === 'boolean' ? checked : (checked ? 'admins' : 'all');
+                    const newValue = checked ? 'admins' : 'all';
                     setPermissions((prev) => ({
                       ...prev,
                       [conf.key]: newValue,
@@ -494,6 +500,36 @@ export function ChatGroupEditDialog({ open, onClose, group }: Props) {
           </Box>
         );
       })}
+      <Box key='setting-announce' sx={{ p: 2, borderRadius: 2, bgcolor: 'background.neutral' }}>
+            <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 1 }}>
+              <Iconify icon='solar:chat-round-dots-bold' width={20} sx={{ color: 'primary.main' }} />
+              <Typography variant="subtitle2">Allow Users</Typography>
+            </Stack>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={settings.isAnnouncementOnly}
+                  onChange={(e) => {
+                    const {checked} = e.target;
+                    setSettings((prev) => ({
+                      ...prev,
+                      isAnnouncementOnly: checked,
+                    }));
+                  }}
+                  color="primary"
+                />
+              }
+              label={
+                <Stack>
+                  <Typography variant="body2">Only admins &amp; owner</Typography>
+                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                    {settings.isAnnouncementOnly ? "Users can only view announcements" : "Users can participate in discussions"}
+                  </Typography>
+                </Stack>
+              }
+              sx={{ mx: 0, width: '100%', justifyContent: 'space-between', flexDirection: 'row-reverse' }}
+            />
+          </Box>
     </Stack>
   );
 

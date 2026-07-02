@@ -172,6 +172,16 @@ export function ChatNavAccount() {
           >
             Edit Profile
           </Button>
+
+             <Typography variant="body2" color="text.secondary" sx={{ mt: 3, textAlign: 'center' }}>
+            <a href={paths.dashboard.privacy} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', color: 'inherit',cursor: 'pointer' }}>
+              Privacy Policy
+            </a>
+            {' | '}
+            <a href={paths.dashboard.terms} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', color: 'inherit',cursor: 'pointer' }}>
+              Terms & Conditions
+            </a>
+          </Typography>
         </Stack>
 
         <Box sx={{ mt: 3 }}>

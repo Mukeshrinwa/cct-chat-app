@@ -125,6 +125,7 @@ export async function updateGroup(
     groupAvatar?: string;
     metadata?: any;
     permissions?: any;
+    settings?: any;
   }
 ) {
   try {

@@ -1,9 +1,10 @@
 import type { IChatMessage, IChatParticipant } from 'src/types/chat';
 
-import { useRef, useMemo, useEffect } from 'react';
+import { useRef, useMemo,useState , useEffect } from 'react';
 
 import Box from '@mui/material/Box';
 import Stack from '@mui/material/Stack';
+import Typography from '@mui/material/Typography';
 import LinearProgress from '@mui/material/LinearProgress';
 
 import { useSearchParams } from 'src/routes/hooks';
@@ -46,6 +47,7 @@ function getMessageImageUrl(message: IChatMessage): string | null {
 export function ChatMessageList({ messages = [], participants, loading }: Props) {
   const searchParams = useSearchParams();
   const targetMessageId = searchParams.get('messageId') || '';
+  const [isDragOver, setIsDragOver] = useState(false);
 
   const { messagesEndRef } = useMessagesScroll(messages, targetMessageId);
 
@@ -108,7 +110,53 @@ export function ChatMessageList({ messages = [], participants, loading }: Props)
   return (
     <>
       {/* Chat background with logo watermark */}
-      <Box sx={{ flex: '1 1 auto', position: 'relative', overflow: 'hidden' }}>
+      <Box
+        onDragOver={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setIsDragOver(true);
+        }}
+        onDragLeave={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setIsDragOver(false);
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setIsDragOver(false);
+          const file = e.dataTransfer.files?.[0];
+          if (file) {
+            window.dispatchEvent(new CustomEvent('chat-file-drop', { detail: { file } }));
+          }
+        }}
+        sx={{ flex: '1 1 auto', position: 'relative', overflow: 'hidden' }}
+      >
+        {isDragOver && (
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 9999,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              bgcolor: 'rgba(213, 215, 243, 0.14)',
+              border: '3px dashed',
+              borderColor: 'primary.main',
+              m: 0,
+              borderRadius: 2,
+            }}
+          >
+            <Typography variant="h4" sx={{ color: 'orange' }}>
+              Drop Your File Here
+            </Typography>
+          </Box>
+        )}
+        
         {/* Logo watermark */}
         <Box
           component="img"

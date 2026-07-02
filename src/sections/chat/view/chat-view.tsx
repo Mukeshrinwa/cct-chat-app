@@ -157,6 +157,7 @@ export function ChatView() {
         g.id === selectedConversationId
       );
 
+
       if (!currentGroup && !groupsLoading) {
         return false;
       }
@@ -178,10 +179,10 @@ export function ChatView() {
     if (typeof window !== 'undefined') {
       const navEntries = window.performance?.getEntriesByType('navigation') || [];
       const isReload = navEntries.length > 0 && (navEntries[0] as PerformanceNavigationTiming).type === 'reload';
-      
+
       if (isReload && !(window as any)._chatReloadHandled) {
         (window as any)._chatReloadHandled = true;
-        
+
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get('id')) {
           router.replace(paths.dashboard.chat);

@@ -169,7 +169,7 @@ function ScrollContent({ containerRoot }: ScrollContentProps) {
   return (
     <StyledRoot ref={containerRef} sx={{ height: scrollRect.scrollWidth, minHeight: '100vh' }}>
       <StyledContainer style={{ background }} data-scrolling={startScroll}>
-        <StyledContent ref={scrollRef} style={{ x }} layout sx={{ ml: `${containerRoot.left}px` }}>
+        <StyledContent ref={scrollRef} style={{ x: x as any }} layout sx={{ ml: `${containerRoot.left}px` }}>
           {ITEMS.map((item) => (
             <Item key={item.title} item={item} />
           ))}

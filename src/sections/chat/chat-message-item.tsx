@@ -336,7 +336,7 @@ export function ChatMessageItem({ message, participants, onOpenLightbox }: Props
       setIsEditing(false);
       toast.success('Message updated');
     } catch (error) {
-      toast.error('Failed to edit message');
+      toast.error('Message cannot be edited After 60 min.');
     }
   };
 

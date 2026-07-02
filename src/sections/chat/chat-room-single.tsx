@@ -102,8 +102,9 @@ export function ChatRoomSingle({ participant }: Props) {
   const isContact = contacts.some((c: any) => c.id === participant?.id || c._id === participant?.id);
   const lastSeenPrivacy = participant?.privacy?.lastSeen || 'everyone';
   const canSeeLastSeen = lastSeenPrivacy === 'everyone' || (lastSeenPrivacy === 'contacts' && isContact);
-  
-  const isOnline = canSeeLastSeen ? onlineUsers.has(participant?.id) : false;
+  const isRealtimeOnline = onlineUsers.has(participant?.id);
+  const isOnline = canSeeLastSeen ? isRealtimeOnline : false;
+  // canSeeLastSeen ? onlineUsers.has(participant?.id) : false;
   
   const isBlocked = currentUser?.blockedUsers?.includes(participant?.id) ?? false;
   const currentUserId = user?.id || (user as any)?._id || '';

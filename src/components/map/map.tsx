@@ -10,8 +10,8 @@ import { CONFIG } from 'src/config-global';
 export const Map = forwardRef<MapRef, MapProps>(({ ...other }, ref) => (
   <MapGL
     ref={ref}
-    mapLib={import('mapbox-gl')}
+    mapLib={import('mapbox-gl') as any}
     mapboxAccessToken={CONFIG.mapbox.apiKey}
-    {...other}
+    {...(other as any)}
   />
 ));

@@ -1,5 +1,7 @@
 import axios, { endpoints } from 'src/utils/axios';
 
+import { CONFIG } from 'src/config-global';
+
 // ----------------------------------------------------------------------
 
 /**
@@ -85,5 +87,56 @@ export async function unblockUser(targetUserId: string): Promise<void> {
   } catch (error) {
     console.error('[API] unblockUser error:', error);
     throw error;
+  }
+}
+
+// ----------------------------------------------------------------------
+/**
+ * Send account deactivation OTP
+ * POST /api/v1/auth/account-deactivation/send-otp
+ */
+export async function sendAccountDeactivationOtp(mobile: string): Promise<string> {
+  try {
+    const baseUrl = CONFIG.site.deactivationUrl || CONFIG.site.serverUrl;
+    const res = await axios.post(
+      `${baseUrl}/api/v1/auth/account-deactivation/send-otp`,
+      { mobile: mobile.trim() }
+    );
+    return res.data?.message || 'Verification code sent successfully.';
+  } catch (error: any) {
+    console.error('[API] sendAccountDeactivationOtp error:', error);
+    throw new Error(
+      error?.response?.data?.error || error?.response?.data?.message || 'Failed to send account deactivation OTP'
+    );
+  }
+}
+
+// ----------------------------------------------------------------------
+export type VerifyAccountDeactivationResponse = {
+  success: boolean;
+  message: string;
+  scheduledDeletionDate?: string;
+};
+
+/**
+ * Verify account deactivation OTP
+ * POST /api/v1/auth/account-deactivation/verify-otp
+ */
+export async function verifyAccountDeactivationOtp(
+  mobile: string,
+  otp: string
+): Promise<VerifyAccountDeactivationResponse> {
+  try {
+    const baseUrl = CONFIG.site.deactivationUrl || CONFIG.site.serverUrl;
+    const res = await axios.post(
+      `${baseUrl}/api/v1/auth/account-deactivation/verify-otp`,
+      { mobile: mobile.trim(), otp }
+    );
+    return res.data;
+  } catch (error: any) {
+    console.error('[API] verifyAccountDeactivationOtp error:', error);
+    throw new Error(
+      error?.response?.data?.error || error?.response?.data?.message || 'Failed to verify account deactivation OTP'
+    );
   }
 }

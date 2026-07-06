@@ -182,8 +182,22 @@ export function ChatNavAccount() {
               Terms & Conditions
             </a>
           </Typography>
-        </Stack>
 
+          <Button
+            fullWidth
+            size="large"
+            color="error"
+            variant="contained"
+            onClick={() => {
+              handleCloseDrawer()
+              window.location.href = paths.dashboard.deleteAccount;
+            }}
+            startIcon={<Iconify icon="ic:round-delete" />}
+          >
+            Delete Account
+          </Button>
+        </Stack>
+          
         <Box sx={{ mt: 3 }}>
           <Button
             fullWidth

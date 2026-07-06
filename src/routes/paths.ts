@@ -96,7 +96,8 @@ export const paths = {
     root: ROOTS.DASHBOARD,
     chat: `/chat`,
     privacy: `/privacy-policy`,
-    terms: `/termsandConditions`
+    terms: `/termsandConditions`,
+    deleteAccount: `/delete-account`,
   },
 };
 

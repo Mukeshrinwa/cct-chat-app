@@ -14,6 +14,7 @@ import { AuthGuard } from 'src/auth/guard';
 const ChatPage = lazy(() => import('src/pages/dashboard/chat'));
 const PrivacyPage = lazy(() => import('src/pages/dashboard/privacy'));
 const TermsPage = lazy(() => import('src/pages/dashboard/terms'));
+const DeleteAccountPage = lazy(() => import('src/pages/dashboard/delete-account'));
 // Test render page by role
 // Blank page
 
@@ -51,6 +52,13 @@ export const dashboardRoutes = [
             </Suspense>
           </AuthGuard>
         ),
+      },
+      {
+       path: 'delete-account',
+        element: 
+          <Suspense fallback={<LoadingScreen />}>
+            <DeleteAccountPage />
+          </Suspense>      
       },
       {
         path: 'privacy-policy',

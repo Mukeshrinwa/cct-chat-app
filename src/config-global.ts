@@ -8,6 +8,7 @@ export type ConfigValue = {
   site: {
     name: string;
     serverUrl: string;
+    deactivationUrl: string;
     assetURL: string;
     basePath: string;
     version: string;
@@ -40,6 +41,7 @@ export const CONFIG: ConfigValue = {
   site: {
     name: 'Minimals',
     serverUrl: (import.meta.env.VITE_SERVER_URL || 'https://server.peoplchat.com').replace(/\/$/, ''),
+    deactivationUrl: (import.meta.env.VITE_DEACTIVATION_SERVER_URL || import.meta.env.VITE_SERVER_URL || 'https://chatserrver.pmitadmin.in').replace(/\/$/, ''),
     assetURL: (import.meta.env.VITE_ASSET_URL || 'https://server.peoplchat.com').replace(/\/$/, ''),
     basePath: import.meta.env.VITE_BASE_PATH ?? '',
     version: packageJson.version,

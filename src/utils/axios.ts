@@ -136,6 +136,8 @@ export const endpoints = {
     getAll: '/api/v1/users/get',
     block: '/api/v1/users/block',
     unblock: '/api/v1/users/unblock',
+    verifyBeforeDelete: '/api/v1/auth/account-deactivation/send-otp',
+    deleteRequestWithOtp: '/api/v1/auth/account-deactivation/verify-otp',
   },
   calls: {
     webhook: '/api/v1/calls/webhook',
